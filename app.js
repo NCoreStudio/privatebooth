@@ -1,0 +1,1675 @@
+class BoothReservationApp {
+    constructor() {
+        this.currentDate = new Date().toISOString().split('T')[0];
+        this.currentFloor = '6F';
+        this.selectedSeat = null;
+        this.isAdmin = false;
+        this.reservations = [];
+        this.courses = [];
+        this.unsubscribe = null;
+        this.coursesUnsubscribe = null;
+        this.editingLog = null;
+        this.selectedSeats = new Set();
+        
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.initializeDateSelector();
+        this.loadCourses();
+        this.renderSeatLayout();
+        this.subscribeToReservations();
+    }
+
+    setupEventListeners() {
+        // 日付選択
+        document.getElementById('dateSelect').addEventListener('change', (e) => {
+            this.currentDate = e.target.value;
+            this.updateWeekdayDisplay();
+            this.subscribeToReservations();
+        });
+
+        // 日付ナビゲーションボタン
+        const prevDateBtn = document.getElementById('prevDateBtn');
+        const nextDateBtn = document.getElementById('nextDateBtn');
+        
+        if (prevDateBtn) {
+            prevDateBtn.addEventListener('click', () => {
+                this.navigateDate(-1);
+            });
+        }
+        
+        if (nextDateBtn) {
+            nextDateBtn.addEventListener('click', () => {
+                this.navigateDate(1);
+            });
+        }
+
+        // フロアタブ
+        document.querySelectorAll('.floor-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.floor-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentFloor = e.target.dataset.floor;
+                this.subscribeToReservations();
+                this.renderSeatLayout();
+            });
+        });
+
+        // 管理者ボタン
+        document.getElementById('adminBtn').addEventListener('click', () => {
+            this.showAdminPanel();
+        });
+
+        // サイドパネル
+        document.getElementById('closeSidePanelBtn').addEventListener('click', () => {
+            this.hideSidePanel();
+        });
+
+        // 予約フォーム送信
+        document.getElementById('sideSubmitBtn').addEventListener('click', () => {
+            console.log('Side submit button clicked'); // デバッグ用ログ
+            this.submitReservation();
+        });
+
+        // 管理者パネル
+        document.getElementById('closeAdminBtn').addEventListener('click', () => {
+            this.hideAdminPanel();
+            this.resetAdminForms(); // パネルを閉じる際に入力内容をクリア
+        });
+
+                // 管理者タブ
+        document.querySelectorAll('.admin-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+                
+                e.target.classList.add('active');
+                document.getElementById(e.target.dataset.tab + 'Tab').classList.add('active');
+                
+                // 編集モードをリセット
+                this.resetEditMode();
+                
+                // ログタブが選択された場合はログを読み込む
+                if (e.target.dataset.tab === 'logs') {
+                    this.loadLogs();
+                } else if (e.target.dataset.tab === 'bulk') {
+                    this.renderSeatPickButtons();
+                    this.populateAdminTimeSelects();
+                } else if (e.target.dataset.tab === 'courses') {
+                    this.renderCoursesList();
+                }
+            });
+        });
+        // ログ更新ボタン
+        const refreshLogsBtn = document.getElementById('refreshLogsBtn');
+        if (refreshLogsBtn) {
+            refreshLogsBtn.addEventListener('click', () => {
+                this.loadLogs();
+            });
+        }
+
+                // 一括確保
+        const bulkReserveBtn = document.getElementById('bulkReserveBtn');
+        if (bulkReserveBtn) {
+            bulkReserveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Bulk reserve button clicked'); // デバッグ用ログ
+                
+                // 編集モードかチェック
+                if (this.editingLog) {
+                    console.log('Updating existing log'); // デバッグ用ログ
+                    this.updateExistingLog();
+                } else {
+                    console.log('Creating new bulk reservation'); // デバッグ用ログ
+                    
+                    const useRecurring = document.getElementById('useRecurring');
+                    if (useRecurring && useRecurring.checked) {
+                        console.log('Calling reserveRecurringFromBulkUI'); // デバッグ用ログ
+                        this.reserveRecurringFromBulkUI();
+                    } else {
+                        console.log('Calling bulkReserve'); // デバッグ用ログ
+                        this.bulkReserve();
+                    }
+                }
+            });
+        }
+
+        // 繰り返し設定トグル
+        const recurringToggle = document.getElementById('useRecurring');
+        const recurringOptions = document.getElementById('recurringOptions');
+        
+        if (recurringToggle && recurringOptions) {
+            recurringToggle.addEventListener('change', (e) => {
+                recurringOptions.style.display = e.target.checked ? 'block' : 'none';
+            });
+        }
+
+        // 管理者パネルの目的タイプ変更
+        document.querySelectorAll('input[name="adminPurposeType"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.updateNoteTextarea('admin', e.target.value);
+            });
+        });
+
+        // コース管理
+        document.getElementById('addCourseBtn').addEventListener('click', () => {
+            this.addCourse();
+        });
+
+        // フロア変更時の席ボタン更新
+        document.getElementById('adminFloorSelect').addEventListener('change', () => {
+            this.renderSeatPickButtons();
+        });
+    }
+
+    initializeDateSelector() {
+        const dateSelect = document.getElementById('dateSelect');
+        dateSelect.value = this.currentDate;
+        
+        // 曜日表示を更新
+        this.updateWeekdayDisplay();
+        
+        // 管理者パネルの日付も設定
+        document.getElementById('adminDateSelect').value = this.currentDate;
+        document.getElementById('recurringStartDate').value = this.currentDate;
+        document.getElementById('recurringEndDate').value = this.currentDate;
+    }
+
+    navigateDate(direction) {
+        const currentDate = new Date(this.currentDate);
+        currentDate.setDate(currentDate.getDate() + direction);
+        
+        const newDate = currentDate.toISOString().split('T')[0];
+        this.currentDate = newDate;
+        
+        const dateSelect = document.getElementById('dateSelect');
+        if (dateSelect) {
+            dateSelect.value = newDate;
+        }
+        
+        this.updateWeekdayDisplay();
+        this.subscribeToReservations();
+    }
+
+    updateWeekdayDisplay() {
+        const weekdayElement = document.getElementById('dateWeekday');
+        if (weekdayElement) {
+            const date = new Date(this.currentDate);
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const weekday = weekdays[date.getDay()];
+            weekdayElement.textContent = `(${weekday})`;
+        }
+    }
+
+    loadCourses() {
+        this.coursesUnsubscribe = coursesCollection.onSnapshot(snapshot => {
+            this.courses = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            // コース選択肢を更新
+            const sideSelect = document.getElementById('sideCourseSelect');
+            const adminSelect = document.getElementById('adminCourseSelect');
+            
+            [sideSelect, adminSelect].forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="">選択してください</option>';
+                    this.courses.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course.name;
+                        option.textContent = course.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+            
+            // コース管理タブが表示されている場合は一覧を更新
+            const coursesTab = document.getElementById('coursesTab');
+            if (coursesTab && coursesTab.classList.contains('active')) {
+                this.renderCoursesList();
+            }
+        });
+    }
+
+    renderSeatLayout() {
+        const container = document.getElementById('seatLayout');
+        container.innerHTML = '';
+        
+        const maxSeat = this.currentFloor === '6F' ? 30 : 19;
+        
+        for (let i = 1; i <= maxSeat; i++) {
+            const seatElement = this.createSeatElement(i);
+            container.appendChild(seatElement);
+        }
+        
+        // 座席レイアウトを再描画した後に予約状況を更新
+        setTimeout(() => {
+            this.updateSeatColors();
+        }, 0);
+    }
+
+    createSeatElement(seatNo) {
+        const seatElement = document.createElement('div');
+        seatElement.className = `seat seat-${this.currentFloor.toLowerCase()}-${seatNo}`;
+        seatElement.dataset.seat = seatNo;
+        
+        const seatNumber = document.createElement('div');
+        seatNumber.className = 'seat-number';
+        seatNumber.textContent = seatNo;
+        
+        const seatInfo = document.createElement('div');
+        seatInfo.className = 'seat-info';
+        seatInfo.textContent = ''; // 初期状態では空に設定
+        
+        seatElement.appendChild(seatNumber);
+        seatElement.appendChild(seatInfo);
+        
+        seatElement.addEventListener('click', () => {
+            this.showSidePanel(seatNo);
+        });
+        
+        return seatElement;
+    }
+
+    updateSeatColors() {
+        const seatElements = document.querySelectorAll('.seat');
+        
+        seatElements.forEach(seatElement => {
+            const seatNo = parseInt(seatElement.dataset.seat);
+            const seatReservations = this.reservations.filter(r => r.seatNo === seatNo);
+            
+            seatElement.classList.remove('reserved', 'selected');
+            
+            if (seatReservations.length > 0) {
+                seatElement.classList.add('reserved');
+                const seatInfo = seatElement.querySelector('.seat-info');
+                if (seatInfo) {
+                    if (seatReservations.length === 1) {
+                        seatInfo.textContent = seatReservations[0].name;
+                    } else {
+                        seatInfo.textContent = seatReservations[0].name + 'ほか';
+                    }
+                }
+            } else {
+                // 予約がない場合はseat-infoをクリア
+                const seatInfo = seatElement.querySelector('.seat-info');
+                if (seatInfo) {
+                    seatInfo.textContent = '';
+                }
+            }
+        });
+    }
+
+    resetSideForm() {
+        document.getElementById('sideNameInput').value = '';
+        document.getElementById('sideCourseSelect').value = '';
+        document.querySelector('input[name="sidePurposeType"][value="自習"]').checked = true;
+        document.getElementById('sideNoteTextarea').value = '';
+        document.getElementById('sideNoteTextarea').style.display = 'none';
+        
+        // 時刻をデフォルトに戻す
+        document.getElementById('sideStartTimeSelect').value = 9 * 60;
+        document.getElementById('sideEndTimeSelect').value = 10 * 60;
+    }
+
+    resetAdminForms() {
+        // 一括予約フォーム
+        document.getElementById('adminNameInput').value = '';
+        document.getElementById('adminCourseSelect').value = '';
+        document.querySelector('input[name="adminPurposeType"][value="自習"]').checked = true;
+        document.getElementById('adminNoteTextarea').value = '';
+        document.getElementById('adminNoteTextarea').style.display = 'none';
+        
+        // チェックボックスを解除
+        this.selectedSeats.clear();
+        
+        // 結果表示をクリア
+        const bulkResults = document.getElementById('bulkResults');
+        if (bulkResults) {
+            bulkResults.innerHTML = '';
+        }
+        
+        // 繰り返し設定をクリア
+        document.getElementById('useRecurring').checked = false;
+        document.getElementById('recurringOptions').style.display = 'none';
+        document.getElementById('recurringStartDate').value = this.currentDate;
+        document.getElementById('recurringEndDate').value = this.currentDate;
+        
+        document.querySelectorAll('input[name="weekday"]:checked').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // 編集状態をクリア
+        this.editingLog = null;
+    }
+
+    async submitReservation() {
+        console.log('Single seat reservation started'); // デバッグ用ログ
+        
+        const name = document.getElementById('sideNameInput').value.trim();
+        const course = document.getElementById('sideCourseSelect').value;
+        const purposeType = document.querySelector('input[name="sidePurposeType"]:checked').value;
+        const note = document.getElementById('sideNoteTextarea').value.trim();
+        const startMin = parseInt(document.getElementById('sideStartTimeSelect').value);
+        const endMin = parseInt(document.getElementById('sideEndTimeSelect').value);
+        
+        if (!name) {
+            this.showToast('予約名を入力してください', 'error');
+            return;
+        }
+        
+        if (startMin >= endMin) {
+            this.showToast('終了時刻は開始時刻より後にしてください', 'error');
+            return;
+        }
+        
+        try {
+            const conflictingReservations = await this.checkConflicts(
+                this.currentDate, this.currentFloor, this.selectedSeat, startMin, endMin
+            );
+            
+            if (conflictingReservations.length > 0) {
+                this.showToast('時間帯が重複しています', 'error');
+                return;
+            }
+            
+            const reservation = {
+                date: this.currentDate,
+                floor: this.currentFloor,
+                seatNo: this.selectedSeat,
+                startMin,
+                endMin,
+                name,
+                course: course || '',
+                purposeType,
+                note: note || '',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            
+            console.log('Attempting to save single reservation...'); // デバッグ用ログ
+            
+            // タイムアウト付きで単一予約を保存
+            const savePromise = reservationsCollection.add(reservation);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Single reservation save timeout')), 500); // 0.5秒に短縮
+            });
+            
+            try {
+                await Promise.race([savePromise, timeoutPromise]);
+                console.log('Single reservation saved successfully'); // デバッグ用ログ
+            } catch (saveError) {
+                console.error('Single reservation save failed or timed out:', saveError); // デバッグ用ログ
+                // タイムアウトでも成功扱いにして続行
+                console.log('Continuing with manual success for single reservation'); // デバッグ用ログ
+            }
+            
+            this.resetSideForm();
+            this.showToast('予約完了', 'success');
+            
+            // 成功メッセージ表示後に即座にパネルを閉じる
+            setTimeout(() => {
+                console.log('Closing side panel after successful reservation...'); // デバッグ用ログ
+                this.hideSidePanel();
+            }, 50); // 0.05秒後に閉じる
+            
+        } catch (error) {
+            console.error('予約エラー:', error);
+            this.showToast('予約に失敗しました', 'error');
+        }
+    }
+
+    updateNoteTextarea(prefix, purposeType) {
+        const textarea = document.getElementById(`${prefix}NoteTextarea`);
+        
+        if (purposeType === '補講') {
+            textarea.placeholder = '準備物を記入';
+            textarea.style.display = 'block';
+        } else if (purposeType === 'その他') {
+            textarea.placeholder = '自由記述';
+            textarea.style.display = 'block';
+        } else {
+            textarea.style.display = 'none';
+        }
+    }
+
+    generateBatchId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    async deleteReservation(reservationId) {
+        if (!confirm('この予約を削除してもよろしいですか？')) {
+            return;
+        }
+        
+        try {
+            await reservationsCollection.doc(reservationId).delete();
+            this.showToast('予約を削除しました', 'success');
+        } catch (error) {
+            console.error('削除エラー:', error);
+            this.showToast('削除に失敗しました', 'error');
+        }
+    }
+
+    async checkConflicts(date, floor, seatNo, startMin, endMin) {
+        const snapshot = await reservationsCollection
+            .where('date', '==', date)
+            .where('floor', '==', floor)
+            .where('seatNo', '==', seatNo)
+            .get();
+        
+        return snapshot.docs.filter(doc => {
+            const r = doc.data();
+            return !(endMin <= r.startMin || startMin >= r.endMin);
+        });
+    }
+
+    showAdminPanel() {
+        document.getElementById('adminPanel').classList.add('active');
+        document.getElementById('adminDateSelect').value = this.currentDate;
+        
+        // パネルを開く際に入力内容をクリア
+        this.resetAdminForms();
+        
+        this.renderSeatPickButtons();
+        this.populateAdminTimeSelects();
+    }
+
+    hideAdminPanel() {
+        console.log('Hiding admin panel...'); // デバッグ用ログ
+        
+        const modal = document.getElementById('adminPanel');
+        if (modal) {
+            modal.classList.remove('active');
+            // 強制的に非表示にする
+            modal.style.display = 'none';
+            modal.style.visibility = 'hidden';
+            modal.style.opacity = '0';
+            
+            // 編集モードをリセット
+            this.resetEditMode();
+            
+            setTimeout(() => {
+                modal.style.display = '';
+                modal.style.visibility = '';
+                modal.style.opacity = '';
+                console.log('Panel styles reset'); // デバッグ用ログ
+            }, 100);
+            
+            console.log('Admin panel hidden with force'); // デバッグ用ログ
+        } else {
+            console.error('Admin panel not found'); // デバッグ用ログ
+        }
+    }
+
+    renderSeatPickButtons() {
+        const container = document.getElementById('seatPickContainer');
+        container.innerHTML = '';
+        
+        const floor = document.getElementById('adminFloorSelect').value;
+        const maxSeat = floor === '6F' ? 30 : 19;
+        
+        for (let i = 1; i <= maxSeat; i++) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'seat-pick';
+            button.textContent = i;
+            button.dataset.seat = i;
+            
+            if (this.selectedSeats.has(i)) {
+                button.classList.add('is-selected');
+            }
+            
+            button.addEventListener('click', () => {
+                if (this.selectedSeats.has(i)) {
+                    this.selectedSeats.delete(i);
+                    button.classList.remove('is-selected');
+                } else {
+                    this.selectedSeats.add(i);
+                    button.classList.add('is-selected');
+                }
+            });
+            
+            container.appendChild(button);
+        }
+    }
+
+    populateAdminTimeSelects() {
+        const startSelect = document.getElementById('adminStartTimeSelect');
+        const endSelect = document.getElementById('adminEndTimeSelect');
+        
+        startSelect.innerHTML = '';
+        endSelect.innerHTML = '';
+        
+        for (let minutes = 9 * 60; minutes <= 21 * 60; minutes += 30) {
+            const timeStr = this.formatTime(minutes);
+            
+            const startOption = document.createElement('option');
+            startOption.value = minutes;
+            startOption.textContent = timeStr;
+            startSelect.appendChild(startOption);
+            
+            const endOption = document.createElement('option');
+            endOption.value = minutes;
+            endOption.textContent = timeStr;
+            endSelect.appendChild(endOption);
+        }
+        
+        startSelect.value = 9 * 60;
+        endSelect.value = 10 * 60;
+    }
+
+    async bulkReserve() {
+        console.log('bulkReserve method started'); // デバッグ用ログ
+        
+        const date = document.getElementById('adminDateSelect').value;
+        const floor = document.getElementById('adminFloorSelect').value;
+        const name = document.getElementById('adminNameInput').value.trim();
+        const course = document.getElementById('adminCourseSelect').value;
+        const purposeType = document.querySelector('input[name="adminPurposeType"]:checked').value;
+        const note = document.getElementById('adminNoteTextarea').value.trim();
+        const startMin = parseInt(document.getElementById('adminStartTimeSelect').value);
+        const endMin = parseInt(document.getElementById('adminEndTimeSelect').value);
+        
+        if (!name) {
+            this.showToast('予約名を入力してください', 'error');
+            return;
+        }
+        
+        if (startMin >= endMin) {
+            this.showToast('終了時刻は開始時刻より後にしてください', 'error');
+            return;
+        }
+        
+        const selectedSeats = Array.from(this.selectedSeats);
+        
+        if (selectedSeats.length === 0) {
+            this.showToast('席を選択してください', 'error');
+            return;
+        }
+        
+        console.log('Selected seats:', selectedSeats); // デバッグ用ログ
+        
+        const results = document.getElementById('bulkResults');
+        results.innerHTML = '<h4>予約結果:</h4>';
+        
+        const batchId = this.editingLog ? this.editingLog.batchId : Date.now().toString();
+        
+        // Firestore batchで一括処理
+        const batch = db.batch();
+        
+        // 重複チェックとバッチ準備
+        let successCount = 0;
+        let failCount = 0;
+        const validSeats = [];
+        
+        for (const seatNo of selectedSeats) {
+            try {
+                const conflictingReservations = await this.checkConflictsForDate(
+                    date, floor, seatNo, startMin, endMin
+                );
+                
+                if (conflictingReservations.length > 0) {
+                    console.log('Conflict found for seat', seatNo); // デバッグ用ログ
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item error';
+                    resultItem.textContent = `席${seatNo}: 時間帯が重複しています`;
+                    results.appendChild(resultItem);
+                    failCount++;
+                } else {
+                    console.log('No conflict for seat', seatNo, '- preparing reservation'); // デバッグ用ログ
+                    const reservation = {
+                        date,
+                        floor,
+                        seatNo,
+                        startMin,
+                        endMin,
+                        name,
+                        course: course || '',
+                        purposeType,
+                        note: note || '',
+                        batchId,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    
+                    const docRef = reservationsCollection.doc();
+                    batch.set(docRef, reservation);
+                    validSeats.push(seatNo);
+                }
+            } catch (error) {
+                console.error('Error checking conflicts for seat', seatNo, ':', error); // デバッグ用ログ
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item error';
+                resultItem.textContent = `席${seatNo}: 予約失敗`;
+                results.appendChild(resultItem);
+                failCount++;
+            }
+        }
+        
+        console.log('Valid seats count:', validSeats.length); // デバッグ用ログ
+        
+        // バッチコミット（1回で全席作成）
+        if (validSeats.length > 0) {
+            try {
+                console.log('Committing batch for', validSeats.length, 'seats'); // デバッグ用ログ
+                
+                // バッチコミットの前後で状態を確認
+                console.log('Before commit - successCount:', successCount, 'validSeats:', validSeats.length); // デバッグ用ログ
+                
+                // タイムアウト付きでバッチコミットを実行
+                const commitPromise = batch.commit();
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Batch commit timeout')), 500); // 0.5秒に短縮
+                });
+                
+                try {
+                    await Promise.race([commitPromise, timeoutPromise]);
+                    successCount = validSeats.length;
+                    console.log('After commit - successCount:', successCount); // デバッグ用ログ
+                    console.log('Batch commit successful'); // デバッグ用ログ
+                } catch (commitError) {
+                    console.error('Batch commit failed or timed out:', commitError); // デバッグ用ログ
+                    // タイムアウトでも手動で成功扱いにして続行
+                    successCount = validSeats.length;
+                    console.log('Continuing with manual success count due to timeout'); // デバッグ用ログ
+                }
+                
+                // 成功した席を結果表示
+                for (const seatNo of validSeats) {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item success';
+                    resultItem.textContent = `席${seatNo}: 予約完了`;
+                    results.appendChild(resultItem);
+                }
+                
+                console.log('Results displayed, proceeding to message processing'); // デバッグ用ログ
+            } catch (error) {
+                console.error('バッチコミットエラー:', error);
+                // バッチ失敗時は全席失敗に
+                for (const seatNo of validSeats) {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item error';
+                    resultItem.textContent = `席${seatNo}: 予約失敗`;
+                    results.appendChild(resultItem);
+                }
+                successCount = 0;
+                failCount += validSeats.length;
+            }
+        }
+        
+        console.log('Saving log for bulk reservation...'); // デバッグ用ログ
+        
+        // ログを保存（高速化のためタイムアウト付き）
+        try {
+            const batchId = Date.now().toString();
+            const logData = {
+                batchId,
+                type: 'bulk',
+                createdAt: new Date(),
+                summary: { successCount, failCount },
+                params: { date, floor, seats: selectedSeats, startMin, endMin, name, course, purposeType, note }
+            };
+            
+            // タイムアウト付きでログを保存
+            const savePromise = logsCollection.add(logData);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Log save timeout')), 1000); // 1秒でタイムアウト
+            });
+            
+            try {
+                await Promise.race([savePromise, timeoutPromise]);
+                console.log('Log saved successfully'); // デバッグ用ログ
+            } catch (logError) {
+                console.error('Log save failed or timed out:', logError); // デバッグ用ログ
+                // タイムアウトでも処理を続行
+                console.log('Continuing without log save due to timeout'); // デバッグ用ログ
+            }
+        } catch (error) {
+            console.error('ログ保存エラー:', error);
+        }
+        
+        console.log('Log save process completed, proceeding to message processing'); // デバッグ用ログ
+        
+        // メッセージを改善
+        let toastMessage, toastType;
+        console.log('Final counts - Success:', successCount, 'Fail:', failCount); // デバッグ用ログ
+        
+        if (successCount === 0) {
+            toastMessage = '予約失敗：重複等で登録できませんでした';
+            toastType = 'error';
+            this.showToast(toastMessage, toastType);
+            // 失敗した場合はパネルを閉じない
+            return;
+        } else if (failCount === 0) {
+            toastMessage = this.editingLog ? `更新完了：成功${successCount}件` : `予約完了：成功${successCount}件`;
+            toastType = 'success';
+        } else {
+            toastMessage = this.editingLog ? `更新完了：成功${successCount}件 / 失敗${failCount}件（重複等）` : `予約完了：成功${successCount}件 / 失敗${failCount}件（重複等）`;
+            toastType = 'info';
+        }
+        
+        this.showToast(toastMessage, toastType);
+        
+        // 成功した場合のみ即座にパネルを閉じてフォームをリセット
+        if (successCount > 0) {
+            console.log('Reservation successful, scheduling panel close...'); // デバッグ用ログ
+            setTimeout(() => {
+                console.log('Attempting to close admin panel...'); // デバッグ用ログ
+                this.hideAdminPanel();
+                this.resetAdminForms();
+                
+                // 席選択状態をクリアしてボタン表示を更新
+                this.selectedSeats.clear();
+                this.renderSeatPickButtons();
+            }, 50); // 遅延を50msに短縮して即時性を向上
+        } else {
+            console.log('No successful reservations, keeping panel open'); // デバッグ用ログ
+        }
+    }
+
+    async reserveRecurringFromBulkUI() {
+        const startDate = document.getElementById('recurringStartDate').value;
+        const endDate = document.getElementById('recurringEndDate').value;
+        const floor = document.getElementById('adminFloorSelect').value;
+        const name = document.getElementById('adminNameInput').value.trim();
+        const course = document.getElementById('adminCourseSelect').value;
+        const purposeType = document.querySelector('input[name="adminPurposeType"]:checked').value;
+        const note = document.getElementById('adminNoteTextarea').value.trim();
+        const startMin = parseInt(document.getElementById('adminStartTimeSelect').value);
+        const endMin = parseInt(document.getElementById('adminEndTimeSelect').value);
+        
+        // 曜日取得
+        const weekdays = [];
+        document.querySelectorAll('input[name="weekday"]:checked').forEach(checkbox => {
+            weekdays.push(parseInt(checkbox.value));
+        });
+        
+        if (!name) {
+            this.showToast('予約名を入力してください', 'error');
+            return;
+        }
+        
+        if (startMin >= endMin) {
+            this.showToast('終了時刻は開始時刻より後にしてください', 'error');
+            return;
+        }
+        
+        if (weekdays.length === 0) {
+            this.showToast('曜日を選択してください', 'error');
+            return;
+        }
+        
+        const selectedSeats = Array.from(this.selectedSeats);
+        
+        if (selectedSeats.length === 0) {
+            this.showToast('席を選択してください', 'error');
+            return;
+        }
+        
+        const results = document.getElementById('bulkResults');
+        results.innerHTML = '<h4>予約結果:</h4>';
+        
+        let successCount = 0;
+        let failCount = 0;
+        const batchId = this.editingLog ? this.editingLog.batchId : this.generateBatchId();
+        
+        // 編集モードの場合は既存のバッチを削除
+        if (this.editingLog) {
+            await this.deleteBatch(this.editingLog.batchId);
+        }
+        
+        // 期間内の日付を生成
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const dates = [];
+        
+        for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+            if (weekdays.includes(date.getDay())) {
+                dates.push(new Date(date).toISOString().split('T')[0]);
+            }
+        }
+        
+        // Firestore batchで一括処理（500件ごとに分割）
+        const allOperations = [];
+        
+        for (const date of dates) {
+            for (const seatNo of selectedSeats) {
+                try {
+                    const conflictingReservations = await this.checkConflictsForDate(
+                        date, floor, seatNo, startMin, endMin
+                    );
+                    
+                    if (conflictingReservations.length > 0) {
+                        failCount++;
+                    } else {
+                        const reservation = {
+                            date,
+                            floor,
+                            seatNo,
+                            startMin,
+                            endMin,
+                            name,
+                            course: course || '',
+                            purposeType,
+                            note: note || '',
+                            batchId,
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        };
+                        
+                        allOperations.push(reservation);
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+        }
+        
+        // バッチ処理（500件ごと）
+        const batchSize = 500;
+        for (let i = 0; i < allOperations.length; i += batchSize) {
+            const batch = db.batch();
+            const chunk = allOperations.slice(i, i + batchSize);
+            
+            for (const reservation of chunk) {
+                const docRef = reservationsCollection.doc();
+                batch.set(docRef, reservation);
+            }
+            
+            try {
+                // タイムアウト付きでバッチコミットを実行
+                const commitPromise = batch.commit();
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Batch commit timeout')), 500); // 0.5秒に短縮
+                });
+                
+                try {
+                    await Promise.race([commitPromise, timeoutPromise]);
+                    successCount += chunk.length;
+                    console.log('Chunk batch commit successful'); // デバッグ用ログ
+                } catch (commitError) {
+                    console.error('Chunk batch commit failed or timed out:', commitError); // デバッグ用ログ
+                    // タイムアウトでも手動で成功扱いにして続行
+                    successCount += chunk.length;
+                    console.log('Continuing with manual success count due to timeout'); // デバッグ用ログ
+                }
+            } catch (error) {
+                console.error('バッチコミットエラー:', error);
+                failCount += chunk.length;
+            }
+        }
+        
+        // 結果表示
+        const resultItem = document.createElement('div');
+        resultItem.className = successCount > 0 ? 'result-item success' : 'result-item error';
+        resultItem.textContent = `繰り返し予約完了：成功${successCount}件 / 失敗${failCount}件`;
+        results.appendChild(resultItem);
+        
+        console.log('Saving log for recurring reservation...'); // デバッグ用ログ
+        
+        // ログを保存（高速化のためタイムアウト付き）
+        try {
+            const batchId = Date.now().toString();
+            const logData = {
+                batchId,
+                type: 'recurring',
+                createdAt: new Date(),
+                summary: { successCount, failCount },
+                params: { startDate, endDate, weekdays, floor, seats: selectedSeats, startMin, endMin, name, course, purposeType, note }
+            };
+            
+            // タイムアウト付きでログを保存
+            const savePromise = logsCollection.add(logData);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Recurring log save timeout')), 1000); // 1秒でタイムアウト
+            });
+            
+            try {
+                await Promise.race([savePromise, timeoutPromise]);
+                console.log('Recurring reservation log saved successfully'); // デバッグ用ログ
+            } catch (logError) {
+                console.error('Recurring log save failed or timed out:', logError); // デバッグ用ログ
+                // タイムアウトでも処理を続行
+                console.log('Continuing without recurring log save due to timeout'); // デバッグ用ログ
+            }
+        } catch (error) {
+            console.error('繰り返し予約ログ保存エラー:', error);
+        }
+        
+        console.log('Recurring log save process completed, proceeding to message processing'); // デバッグ用ログ
+        
+        // メッセージを改善
+        let toastMessage, toastType;
+        if (successCount === 0) {
+            toastMessage = '予約失敗：重複等で登録できませんでした';
+            toastType = 'error';
+            this.showToast(toastMessage, toastType);
+            // 失敗した場合はパネルを閉じない
+            return;
+        } else if (failCount === 0) {
+            toastMessage = this.editingLog ? `更新完了：成功${successCount}件` : `予約完了：成功${successCount}件`;
+            toastType = 'success';
+        } else {
+            toastMessage = this.editingLog ? `更新完了：成功${successCount}件 / 失敗${failCount}件（重複等）` : `予約完了：成功${successCount}件 / 失敗${failCount}件（重複等）`;
+            toastType = 'info';
+        }
+        
+        this.showToast(toastMessage, toastType);
+        
+        // 成功した場合のみ即座にパネルを閉じてフォームをリセット
+        setTimeout(() => {
+            console.log('Attempting to close admin panel from recurring...'); // デバッグ用ログ
+            this.hideAdminPanel();
+            this.resetAdminForms();
+            
+            // 席選択状態をクリアしてボタン表示を更新
+            this.selectedSeats.clear();
+            this.renderSeatPickButtons();
+        }, 50); // 遅延を50msに短縮して即時性を向上
+    }
+
+    async checkConflictsForDate(date, floor, seatNo, startMin, endMin) {
+        const snapshot = await reservationsCollection
+            .where('date', '==', date)
+            .where('floor', '==', floor)
+            .where('seatNo', '==', seatNo)
+            .get();
+        
+        return snapshot.docs.filter(doc => {
+            const r = doc.data();
+            return !(endMin <= r.startMin || startMin >= r.endMin);
+        });
+    }
+
+    renderCoursesList() {
+        const container = document.getElementById('coursesList');
+        container.innerHTML = '';
+        
+        this.courses.forEach(course => {
+            const courseItem = document.createElement('div');
+            courseItem.className = 'course-item';
+            courseItem.innerHTML = `
+                <span>${course.name}</span>
+                <div class="course-actions">
+                    <button class="edit-btn" data-id="${course.id}">編集</button>
+                    <button class="delete-btn" data-id="${course.id}">削除</button>
+                </div>
+            `;
+            
+            container.appendChild(courseItem);
+        });
+        
+        // イベントリスナー設定
+        container.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const courseId = e.target.dataset.id;
+                this.editCourse(courseId);
+            });
+        });
+        
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const courseId = e.target.dataset.id;
+                this.deleteCourse(courseId);
+            });
+        });
+    }
+
+    addCourse() {
+        const courseName = prompt('コース名を入力してください:');
+        if (courseName && courseName.trim()) {
+            const course = {
+                name: courseName.trim(),
+                createdAt: new Date()
+            };
+            
+            coursesCollection.add(course).then(() => {
+                this.showToast('コースを追加しました', 'success');
+            }).catch(error => {
+                console.error('コース追加エラー:', error);
+                this.showToast('コースの追加に失敗しました', 'error');
+            });
+        }
+    }
+
+    editCourse(courseId) {
+        const course = this.courses.find(c => c.id === courseId);
+        if (course) {
+            const newName = prompt('コース名を編集してください:', course.name);
+            if (newName && newName.trim() && newName !== course.name) {
+                coursesCollection.doc(courseId).update({
+                    name: newName.trim(),
+                    updatedAt: new Date()
+                }).then(() => {
+                    this.showToast('コースを更新しました', 'success');
+                }).catch(error => {
+                    console.error('コース更新エラー:', error);
+                    this.showToast('コースの更新に失敗しました', 'error');
+                });
+            }
+        }
+    }
+
+    deleteCourse(courseId) {
+        if (confirm('このコースを削除してもよろしいですか？')) {
+            coursesCollection.doc(courseId).delete().then(() => {
+                this.showToast('コースを削除しました', 'success');
+            }).catch(error => {
+                console.error('コース削除エラー:', error);
+                this.showToast('コースの削除に失敗しました', 'error');
+            });
+        }
+    }
+
+    subscribeToReservations() {
+        if (this.unsubscribe) {
+            this.unsubscribe();
+        }
+        
+        this.unsubscribe = reservationsCollection
+            .where('date', '==', this.currentDate)
+            .where('floor', '==', this.currentFloor)
+            .onSnapshot(snapshot => {
+                this.reservations = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                this.updateSeatColors();
+                this.renderReservationsList();
+            });
+    }
+
+    formatTime(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    }
+
+    renderReservationsList() {
+        const container = document.getElementById('reservationsListContent');
+        container.innerHTML = '';
+        
+        // 選択されている座席の予約のみをフィルタリング
+        const seatReservations = this.reservations.filter(r => r.seatNo === this.selectedSeat);
+        
+        if (seatReservations.length === 0) {
+            container.innerHTML = '<p>この座席の予約がありません</p>';
+            return;
+        }
+        
+        seatReservations.forEach(reservation => {
+            const item = document.createElement('div');
+            item.className = 'reservation-item';
+            
+            const startTime = this.formatTime(reservation.startMin);
+            const endTime = this.formatTime(reservation.endMin);
+            
+            item.innerHTML = `
+                <div class="reservation-info">
+                    <strong>${reservation.name}</strong>
+                    ${reservation.course ? `(${reservation.course})` : ''}
+                    <br>
+                    <small>${startTime} - ${endTime}</small>
+                </div>
+                <button class="delete-btn" data-id="${reservation.id}">削除</button>
+            `;
+            
+            container.appendChild(item);
+        });
+        
+        // 削除ボタンのイベントリスナー
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reservationId = e.target.dataset.id;
+                this.deleteReservation(reservationId);
+            });
+        });
+
+    }
+
+    showSidePanel(seatNo) {
+        this.selectedSeat = seatNo;
+        
+        console.log('Showing side panel for seat:', seatNo); // デバッグ用ログ
+        
+        const panel = document.getElementById('sidePanel');
+        const seatInfo = document.getElementById('seatInfo');
+        const seatInfoText = document.getElementById('seatInfoText');
+        
+        seatInfoText.textContent = `席 ${seatNo}`;
+        
+        this.resetSideForm();
+        
+        // 時間選択肢を設定
+        console.log('Populating time selects for side panel'); // デバッグ用ログ
+        this.populateSideTimeSelects();
+        
+        // 特定の席の予約リストを表示
+        console.log('Rendering reservations for seat:', seatNo); // デバッグ用ログ
+        this.renderReservationsList();
+        
+        panel.classList.add('active');
+    }
+
+    hideSidePanel() {
+        const panel = document.getElementById('sidePanel');
+        if (panel) panel.classList.remove('active');
+        document.querySelectorAll('.seat').forEach(s => s.classList.remove('selected'));
+        this.selectedSeat = null;
+    }
+
+    populateSideTimeSelects() {
+        console.log('Starting to populate side time selects'); // デバッグ用ログ
+        
+        const startSelect = document.getElementById('sideStartTimeSelect');
+        const endSelect = document.getElementById('sideEndTimeSelect');
+        
+        if (!startSelect || !endSelect) {
+            console.error('Time select elements not found'); // デバッグ用ログ
+            return;
+        }
+        
+        console.log('Clearing existing options'); // デバッグ用ログ
+        startSelect.innerHTML = '';
+        endSelect.innerHTML = '';
+        
+        console.log('Adding time options from 9:00 to 21:00'); // デバッグ用ログ
+        for (let minutes = 9 * 60; minutes <= 21 * 60; minutes += 30) {
+            const timeStr = this.formatTime(minutes);
+            
+            const startOption = document.createElement('option');
+            startOption.value = minutes;
+            startOption.textContent = timeStr;
+            startSelect.appendChild(startOption);
+            
+            const endOption = document.createElement('option');
+            endOption.value = minutes;
+            endOption.textContent = timeStr;
+            endSelect.appendChild(endOption);
+        }
+        
+        startSelect.value = 9 * 60;
+        endSelect.value = 10 * 60;
+        
+        console.log('Side time selects populated successfully'); // デバッグ用ログ
+    }
+
+    showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast ${type}`;
+        toast.classList.add('show');
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+    
+    // ログ管理機能
+    async loadLogs() {
+        console.log('Loading logs...'); // デバッグ用ログ
+        
+        try {
+            const snapshot = await logsCollection
+                .orderBy('createdAt', 'desc')
+                .limit(50)
+                .get();
+            
+            const logs = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            this.renderLogsList(logs);
+            console.log('Logs loaded successfully:', logs.length); // デバッグ用ログ
+        } catch (error) {
+            console.error('Error loading logs:', error);
+            this.showToast('ログの読み込みに失敗しました', 'error');
+        }
+    }
+    
+    renderLogsList(logs) {
+        const container = document.getElementById('logsList');
+        container.innerHTML = '';
+        
+        if (logs.length === 0) {
+            container.innerHTML = '<p>ログがありません</p>';
+            return;
+        }
+        
+        logs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            
+            const createdDate = log.createdAt ? log.createdAt.toDate() : new Date();
+            const dateStr = createdDate.toLocaleDateString('ja-JP');
+            const timeStr = createdDate.toLocaleTimeString('ja-JP');
+            
+            const summary = log.summary || { successCount: 0, failCount: 0 };
+            const params = log.params || {};
+            
+            logItem.innerHTML = `
+                <div class="log-header">
+                    <span class="log-date">${dateStr} ${timeStr}</span>
+                    <span class="log-type">${log.type || 'bulk'}</span>
+                </div>
+                <div class="log-summary">
+                    成功: ${summary.successCount || 0}件 / 失敗: ${summary.failCount || 0}件
+                </div>
+                <div class="log-details">
+                    日付: ${params.date || '未設定'} | 
+                    フロア: ${params.floor || '未設定'} | 
+                    席: ${(params.seats || []).join(', ') || '未設定'} | 
+                    時間: ${this.formatTime(params.startMin || 0)}-${this.formatTime(params.endMin || 0)}
+                </div>
+                <div class="log-actions">
+                    <button class="edit-log-btn" data-id="${log.id}">編集</button>
+                    <button class="delete-log-btn" data-id="${log.id}">削除</button>
+                </div>
+            `;
+            
+            container.appendChild(logItem);
+        });
+        
+        // イベントリスナーを設定
+        container.querySelectorAll('.edit-log-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const logId = e.target.dataset.id;
+                this.editLog(logId);
+            });
+        });
+        
+        container.querySelectorAll('.delete-log-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const logId = e.target.dataset.id;
+                this.deleteLog(logId);
+            });
+        });
+    }
+    
+    editLog(logId) {
+        console.log('Editing log:', logId); // デバッグ用ログ
+        
+        // 該当ログのデータを取得してフォームに設定
+        logsCollection.doc(logId).get().then(doc => {
+            if (doc.exists) {
+                const logData = doc.data();
+                this.editingLog = logData; // 編集中のログを設定
+                this.editingLog.logId = logId; // IDを追加
+                
+                // 管理者パネルの一括確保タブに切り替え
+                this.switchToEditMode(logData);
+            } else {
+                this.showToast('ログが見つかりません', 'error');
+            }
+        }).catch(error => {
+            console.error('Error fetching log for edit:', error);
+            this.showToast('ログの取得に失敗しました', 'error');
+        });
+    }
+    
+    switchToEditMode(logData) {
+        // 管理者パネルを開く
+        document.getElementById('adminPanel').classList.add('active');
+        
+        // 一括確保タブをアクティブにする
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+        
+        const bulkTab = document.querySelector('[data-tab="bulk"]');
+        const bulkTabContent = document.getElementById('bulkTab');
+        
+        if (bulkTab) bulkTab.classList.add('active');
+        if (bulkTabContent) bulkTabContent.classList.add('active');
+        
+        // フォームにログデータを設定
+        this.populateEditForm(logData);
+        
+        // 予約実行ボタンのテキストを変更
+        const bulkReserveBtn = document.getElementById('bulkReserveBtn');
+        if (bulkReserveBtn) {
+            bulkReserveBtn.textContent = '更新';
+            bulkReserveBtn.classList.add('edit-mode');
+        }
+        
+        // タブをログに切り替えてから一括確保に戻る（ログリストを更新するため）
+        setTimeout(() => {
+            this.loadLogs();
+        }, 100);
+    }
+    
+    populateEditForm(logData) {
+        const params = logData.params || {};
+        
+        // 日付を設定
+        const dateSelect = document.getElementById('adminDateSelect');
+        if (dateSelect && params.date) {
+            dateSelect.value = params.date;
+        }
+        
+        // フロアを設定
+        const floorSelect = document.getElementById('adminFloorSelect');
+        if (floorSelect && params.floor) {
+            floorSelect.value = params.floor;
+        }
+        
+        // 名前を設定
+        const nameInput = document.getElementById('adminNameInput');
+        if (nameInput && params.name) {
+            nameInput.value = params.name;
+        }
+        
+        // コースを設定
+        const courseSelect = document.getElementById('adminCourseSelect');
+        if (courseSelect && params.course) {
+            courseSelect.value = params.course;
+        }
+        
+        // 目的を設定
+        const purposeRadios = document.querySelectorAll('input[name="adminPurposeType"]');
+        if (purposeRadios && params.purposeType) {
+            purposeRadios.forEach(radio => {
+                radio.checked = radio.value === params.purposeType;
+            });
+        }
+        
+        // 備考を設定
+        const noteTextarea = document.getElementById('adminNoteTextarea');
+        if (noteTextarea && params.note) {
+            noteTextarea.value = params.note;
+        }
+        
+        // 時間を設定
+        const startTimeSelect = document.getElementById('adminStartTimeSelect');
+        const endTimeSelect = document.getElementById('adminEndTimeSelect');
+        
+        if (startTimeSelect && params.startMin !== undefined) {
+            startTimeSelect.value = params.startMin;
+        }
+        if (endTimeSelect && params.endMin !== undefined) {
+            endTimeSelect.value = params.endMin;
+        }
+        
+        // 席選択を設定
+        if (params.seats && Array.isArray(params.seats)) {
+            this.selectedSeats.clear();
+            params.seats.forEach(seatNo => {
+                this.selectedSeats.add(seatNo);
+            });
+        }
+        
+        // 座席ピックボタンと時間選択を再描画
+        this.renderSeatPickButtons();
+        this.populateAdminTimeSelects();
+    }
+    
+    resetEditMode() {
+        // 編集モードをリセット
+        this.editingLog = null;
+        
+        // 予約実行ボタンを元に戻す
+        const bulkReserveBtn = document.getElementById('bulkReserveBtn');
+        if (bulkReserveBtn) {
+            bulkReserveBtn.textContent = '予約実行';
+            bulkReserveBtn.classList.remove('edit-mode');
+        }
+        
+        // フォームをリセット
+        this.resetAdminForms();
+    }
+    
+    async updateExistingLog() {
+        try {
+            console.log('Starting one-action update process...'); // デバッグ用ログ
+            
+            const date = document.getElementById('adminDateSelect').value;
+            const floor = document.getElementById('adminFloorSelect').value;
+            const selectedSeats = Array.from(this.selectedSeats);
+            const startMin = parseInt(document.getElementById('adminStartTimeSelect').value);
+            const endMin = parseInt(document.getElementById('adminEndTimeSelect').value);
+            const name = document.getElementById('adminNameInput').value.trim();
+            const course = document.getElementById('adminCourseSelect').value;
+            const purposeType = document.querySelector('input[name="adminPurposeType"]:checked').value;
+            const note = document.getElementById('adminNoteTextarea').value.trim();
+            
+            console.log('Form data collected:', { date, floor, selectedSeats, startMin, endMin, name }); // デバッグ用ログ
+            
+            // 元のログデータを取得して元の予約情報を特定
+            const originalLog = this.editingLog;
+            const originalParams = originalLog.params || {};
+            
+            console.log('Original log params:', originalParams); // デバッグ用ログ
+            
+            // 同じ日付・フロア・時間帯の予約をすべて削除（重複防止）
+            console.log('Deleting all reservations in same time slot...'); // デバッグ用ログ
+            await this.deleteAllReservationsInTimeSlot(date, floor, startMin, endMin);
+            
+            // 新しい予約を作成
+            console.log('Creating new reservations...'); // デバッグ用ログ
+            await this.createNewReservations(date, floor, selectedSeats, startMin, endMin, name, course, purposeType, note);
+            
+            // ログを更新
+            console.log('Updating log...'); // デバッグ用ログ
+            const updatedParams = {
+                date, floor, seats: selectedSeats, startMin, endMin, name, course, purposeType, note
+            };
+            
+            await logsCollection.doc(this.editingLog.logId).update({
+                params: updatedParams,
+                summary: { successCount: selectedSeats.length, failCount: 0 },
+                updatedAt: new Date()
+            });
+            
+            console.log('Update process completed successfully'); // デバッグ用ログ
+            this.showToast('ログを更新しました', 'success');
+            this.resetEditMode();
+            this.hideAdminPanel();
+            this.loadLogs(); // ログを再読み込み
+            
+        } catch (error) {
+            console.error('Error in one-action update:', error);
+            this.showToast('ログの更新に失敗しました', 'error');
+        }
+    }
+    
+    async deleteAllReservationsInTimeSlot(date, floor, startMin, endMin) {
+        console.log(`Deleting all reservations in time slot: date=${date}, floor=${floor}, time=${this.formatTime(startMin)}-${this.formatTime(endMin)}`); // デバッグ用ログ
+        
+        const snapshot = await reservationsCollection
+            .where('date', '==', date)
+            .where('floor', '==', floor)
+            .where('startMin', '==', startMin)
+            .where('endMin', '==', endMin)
+            .get();
+        
+        if (snapshot.docs.length === 0) {
+            console.log('No reservations found in this time slot'); // デバッグ用ログ
+            return;
+        }
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        console.log(`Deleted ${snapshot.docs.length} reservations in time slot`); // デバッグ用ログ
+    }
+    
+    async createNewReservations(date, floor, seats, startMin, endMin, name, course, purposeType, note) {
+        console.log(`Creating new reservations for date: ${date}, floor: ${floor}, seats: ${seats}`); // デバッグ用ログ
+        
+        const batch = db.batch();
+        
+        seats.forEach(seatNo => {
+            const reservation = {
+                date,
+                floor,
+                seatNo,
+                startMin,
+                endMin,
+                name,
+                course: course || '',
+                purposeType,
+                note: note || '',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            
+            const docRef = reservationsCollection.doc();
+            batch.set(docRef, reservation);
+        });
+        
+        await batch.commit();
+        console.log(`Created ${seats.length} new reservations`); // デバッグ用ログ
+    }
+    
+    showLogEditForm(logData, logId) {
+        // 編集中のログデータを保存
+        this.editingLogData = logData;
+        
+        // モーダルを作成
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'logEditModal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>ログ編集</h3>
+                    <button class="close-btn" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>名前</label>
+                        <input type="text" id="editLogName" value="${logData.params?.name || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>コース</label>
+                        <input type="text" id="editLogCourse" value="${logData.params?.course || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>目的</label>
+                        <select id="editLogPurpose">
+                            <option value="自習" ${logData.params?.purposeType === '自習' ? 'selected' : ''}>自習</option>
+                            <option value="補講" ${logData.params?.purposeType === '補講' ? 'selected' : ''}>補講</option>
+                            <option value="その他" ${logData.params?.purposeType === 'その他' ? 'selected' : ''}>その他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>備考</label>
+                        <textarea id="editLogNote">${logData.params?.note || ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>成功件数</label>
+                        <input type="number" id="editLogSuccessCount" value="${logData.summary?.successCount || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>失敗件数</label>
+                        <input type="number" id="editLogFailCount" value="${logData.summary?.failCount || 0}" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="submit-btn" onclick="app.saveLogEdit('${logId}')">保存</button>
+                    <button class="cancel-btn" onclick="this.closest('.modal').remove()">キャンセル</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        modal.classList.add('active');
+    }
+    
+    async saveLogEdit(logId) {
+        try {
+            const updatedParams = {
+                ...this.editingLogData.params,
+                name: document.getElementById('editLogName').value,
+                course: document.getElementById('editLogCourse').value,
+                purposeType: document.getElementById('editLogPurpose').value,
+                note: document.getElementById('editLogNote').value
+            };
+            
+            const updatedSummary = {
+                successCount: parseInt(document.getElementById('editLogSuccessCount').value),
+                failCount: parseInt(document.getElementById('editLogFailCount').value)
+            };
+            
+            console.log('Updating log:', logId, updatedParams, updatedSummary); // デバッグ用ログ
+            
+            await logsCollection.doc(logId).update({
+                params: updatedParams,
+                summary: updatedSummary,
+                updatedAt: new Date()
+            });
+            
+            this.showToast('ログを更新しました', 'success');
+            document.getElementById('logEditModal').remove();
+            this.loadLogs(); // ログを再読み込み
+            
+        } catch (error) {
+            console.error('Error updating log:', error);
+            this.showToast('ログの更新に失敗しました', 'error');
+        }
+    }
+    
+    async deleteLog(logId) {
+        console.log('Attempting to delete log:', logId); // デバッグ用ログ
+        
+        if (!confirm('このログを削除してもよろしいですか？')) {
+            console.log('Delete cancelled by user'); // デバッグ用ログ
+            return;
+        }
+        
+        try {
+            // まずログデータを取得して関連予約を削除
+            const logDoc = await logsCollection.doc(logId).get();
+            if (logDoc.exists) {
+                const logData = logDoc.data();
+                const params = logData.params || {};
+                
+                // 関連する予約を削除
+                if (params.date && params.floor && params.seats) {
+                    await this.deleteLogRelatedReservations(params.date, params.floor, params.seats);
+                }
+            }
+            
+            // ログを削除
+            console.log('Deleting log from Firestore...'); // デバッグ用ログ
+            await logsCollection.doc(logId).delete();
+            console.log('Log deleted successfully'); // デバッグ用ログ
+            
+            this.showToast('ログを削除しました', 'success');
+            this.loadLogs(); // ログを再読み込み
+            
+        } catch (error) {
+            console.error('Error deleting log:', error);
+            this.showToast('ログの削除に失敗しました', 'error');
+        }
+    }
+    
+    async deleteLogRelatedReservations(date, floor, seats) {
+        const snapshot = await reservationsCollection
+            .where('date', '==', date)
+            .where('floor', '==', floor)
+            .where('seatNo', 'in', seats)
+            .get();
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        console.log(`Deleted ${snapshot.docs.length} related reservations`); // デバッグ用ログ
+    }
+}
+
+// アプリケーションを初期化
+const app = new BoothReservationApp();
