@@ -1,12 +1,12 @@
 // Firebase初期化設定
-// 以下の設定値を実際のFirebaseプロジェクトの値に差し替えてください
 const firebaseConfig = {
-    apiKey: "your-api-key-here",                    // 実際のAPIキーに差し替え
-    authDomain: "your-project-id.firebaseapp.com",  // 実際の認証ドメインに差し替え
-    projectId: "your-project-id",                    // 実際のプロジェクトIDに差し替え
-    storageBucket: "your-project-id.appspot.com",   // 実際のストレージバケットに差し替え
-    messagingSenderId: "123456789",                  // 実際の送信者IDに差し替え
-    appId: "1:123456789:web:abcdef123456"           // 実際のアプリIDに差し替え
+    apiKey: "AIzaSyBwwyt71iwFNFJoHBxibe5D0rHXbKcCFf0",
+    authDomain: "private-booth-8a45b.firebaseapp.com",
+    projectId: "private-booth-8a45b",
+    storageBucket: "private-booth-8a45b.firebasestorage.app",
+    messagingSenderId: "878271651490",
+    appId: "1:878271651490:web:49ed9baaf58da969f981fb",
+    measurementId: "G-PJQ5Y18LJ6"
 };
 
 // Firebase初期化

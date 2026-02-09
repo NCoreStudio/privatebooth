@@ -1480,53 +1480,80 @@ class BoothReservationApp {
             
         } catch (error) {
             console.error('Error in one-action update:', error);
-            this.showToast('ログの更新に失敗しました', 'error');
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            
+            // より詳細なエラーメッセージを表示
+            let errorMessage = 'ログの更新に失敗しました';
+            if (error.message) {
+                errorMessage += `: ${error.message}`;
+            }
+            if (error.code) {
+                errorMessage += ` (コード: ${error.code})`;
+            }
+            
+            this.showToast(errorMessage, 'error');
         }
     }
     
     async updateReservationsInTransaction(date, floor, seats, startMin, endMin, name, course, purposeType, note) {
         console.log(`Updating reservations in transaction for date: ${date}, floor: ${floor}, seats: ${seats}`); // デバッグ用ログ
         
-        // Firestoreトランザクションを使用して原子性を保証
-        await db.runTransaction(async (transaction) => {
-            // 1. 既存の予約を検索して削除
-            const existingSnapshot = await transaction.get(
-                reservationsCollection
-                    .where('date', '==', date)
-                    .where('floor', '==', floor)
-                    .where('startMin', '==', startMin)
-                    .where('endMin', '==', endMin)
-            );
+        try {
+            // まずトランザクション外で既存の予約を検索
+            const existingSnapshot = await reservationsCollection
+                .where('date', '==', date)
+                .where('floor', '==', floor)
+                .where('startMin', '==', startMin)
+                .where('endMin', '==', endMin)
+                .get();
             
             console.log(`Found ${existingSnapshot.docs.length} existing reservations to delete`); // デバッグ用ログ
             
-            // 2. 既存の予約を削除
-            existingSnapshot.docs.forEach(doc => {
-                transaction.delete(doc.ref);
+            // Firestoreトランザクションを使用して原子性を保証
+            await db.runTransaction(async (transaction) => {
+                // 1. 既存の予約を削除
+                existingSnapshot.docs.forEach(doc => {
+                    console.log(`Deleting reservation: ${doc.id}`); // デバッグ用ログ
+                    transaction.delete(doc.ref);
+                });
+                
+                // 2. 新しい予約を作成
+                seats.forEach(seatNo => {
+                    const reservation = {
+                        date,
+                        floor,
+                        seatNo,
+                        startMin,
+                        endMin,
+                        name,
+                        course: course || '',
+                        purposeType,
+                        note: note || '',
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    
+                    console.log(`Creating reservation for seat: ${seatNo}`); // デバッグ用ログ
+                    const docRef = reservationsCollection.doc();
+                    transaction.set(docRef, reservation);
+                });
             });
             
-            // 3. 新しい予約を作成
-            seats.forEach(seatNo => {
-                const reservation = {
-                    date,
-                    floor,
-                    seatNo,
-                    startMin,
-                    endMin,
-                    name,
-                    course: course || '',
-                    purposeType,
-                    note: note || '',
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                };
-                
-                const docRef = reservationsCollection.doc();
-                transaction.set(docRef, reservation);
+            console.log(`Transaction completed: deleted existing reservations and created ${seats.length} new reservations`); // デバッグ用ログ
+            
+        } catch (error) {
+            console.error('Transaction error:', error);
+            console.error('Transaction error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
             });
-        });
-        
-        console.log(`Transaction completed: deleted existing reservations and created ${seats.length} new reservations`); // デバッグ用ログ
+            throw error; // 上位のcatchにエラーを伝播
+        }
     }
     
     async deleteAllReservationsInTimeSlot(date, floor, startMin, endMin) {
