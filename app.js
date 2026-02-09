@@ -1447,13 +1447,9 @@ class BoothReservationApp {
             
             console.log('Original log params:', originalParams); // デバッグ用ログ
             
-            // 同じ日付・フロア・時間帯の予約をすべて削除（重複防止）
-            console.log('Deleting all reservations in same time slot...'); // デバッグ用ログ
-            await this.deleteAllReservationsInTimeSlot(date, floor, startMin, endMin);
-            
-            // 新しい予約を作成
-            console.log('Creating new reservations...'); // デバッグ用ログ
-            await this.createNewReservations(date, floor, selectedSeats, startMin, endMin, name, course, purposeType, note);
+            // 1つのトランザクションで削除と作成を同時に実行
+            console.log('Starting transaction for delete and create operations...'); // デバッグ用ログ
+            await this.updateReservationsInTransaction(date, floor, selectedSeats, startMin, endMin, name, course, purposeType, note);
             
             // ログを更新
             console.log('Updating log...'); // デバッグ用ログ
@@ -1469,14 +1465,68 @@ class BoothReservationApp {
             
             console.log('Update process completed successfully'); // デバッグ用ログ
             this.showToast('ログを更新しました', 'success');
+            
+            // UIを即時更新
             this.resetEditMode();
             this.hideAdminPanel();
-            this.loadLogs(); // ログを再読み込み
+            
+            // 予約データを再読み込みしてUIを更新
+            this.subscribeToReservations();
+            
+            // 少し遅延してログを再読み込み（UIの更新を確実にするため）
+            setTimeout(() => {
+                this.loadLogs(); // ログを再読み込み
+            }, 100);
             
         } catch (error) {
             console.error('Error in one-action update:', error);
             this.showToast('ログの更新に失敗しました', 'error');
         }
+    }
+    
+    async updateReservationsInTransaction(date, floor, seats, startMin, endMin, name, course, purposeType, note) {
+        console.log(`Updating reservations in transaction for date: ${date}, floor: ${floor}, seats: ${seats}`); // デバッグ用ログ
+        
+        // Firestoreトランザクションを使用して原子性を保証
+        await db.runTransaction(async (transaction) => {
+            // 1. 既存の予約を検索して削除
+            const existingSnapshot = await transaction.get(
+                reservationsCollection
+                    .where('date', '==', date)
+                    .where('floor', '==', floor)
+                    .where('startMin', '==', startMin)
+                    .where('endMin', '==', endMin)
+            );
+            
+            console.log(`Found ${existingSnapshot.docs.length} existing reservations to delete`); // デバッグ用ログ
+            
+            // 2. 既存の予約を削除
+            existingSnapshot.docs.forEach(doc => {
+                transaction.delete(doc.ref);
+            });
+            
+            // 3. 新しい予約を作成
+            seats.forEach(seatNo => {
+                const reservation = {
+                    date,
+                    floor,
+                    seatNo,
+                    startMin,
+                    endMin,
+                    name,
+                    course: course || '',
+                    purposeType,
+                    note: note || '',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+                
+                const docRef = reservationsCollection.doc();
+                transaction.set(docRef, reservation);
+            });
+        });
+        
+        console.log(`Transaction completed: deleted existing reservations and created ${seats.length} new reservations`); // デバッグ用ログ
     }
     
     async deleteAllReservationsInTimeSlot(date, floor, startMin, endMin) {
