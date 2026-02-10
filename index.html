@@ -23,6 +23,7 @@
                     <button class="floor-tab" data-floor="7F">7F</button>
                 </div>
                 <button class="admin-btn" id="adminBtn">管理者</button>
+                <button class="preview-btn" id="previewBtn">プレビュー</button>
             </div>
             <div class="legend">
                 <div class="legend-item">
@@ -35,6 +36,38 @@
                 </div>
             </div>
         </header>
+
+        <!-- プレビューモーダル -->
+        <div id="previewModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>予約状況プレビュー</h2>
+                    <span class="close-button" id="closePreviewModalBtn">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="preview-controls">
+                        <label for="previewDate">日付:</label>
+                        <input type="date" id="previewDate">
+                        <div class="preview-floor-tabs">
+                            <button class="preview-floor-tab active" data-floor="6F">6F</button>
+                            <button class="preview-floor-tab" data-floor="7F">7F</button>
+                        </div>
+                    </div>
+                    <div class="preview-table-container">
+                        <table class="preview-table" id="previewTable">
+                            <thead>
+                                <tr id="timeHeaderRow">
+                                    <th>席番号</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                                <!-- 座席と予約情報がここに動的に挿入されます -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- 座席レイアウト -->
         <main class="main">

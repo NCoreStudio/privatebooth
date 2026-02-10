@@ -13,7 +13,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    width: 100%;
     margin: 0 auto;
     padding: 20px;
     min-height: 100vh;
@@ -423,7 +423,7 @@ body {
 .modal-content {
     background: white;
     border-radius: 10px;
-    max-width: 500px;
+    max-width: none; /* 制限を解除してプレビュー用CSSを有効に */
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -506,7 +506,183 @@ body {
     justify-content: center;
 }
 
-.close-btn:hover {
+/* プレビューボタン */
+.preview-btn {
+    padding: 10px 20px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+    margin-left: 10px;
+}
+
+.preview-btn:hover {
+    background: #138496;
+}
+
+/* プレビューモーダル */
+#previewModal.modal-content {
+    width: 95vw; /* 画面の95%でレスポンシブに */
+    max-width: 95vw; /* 最大幅も95vwに */
+    max-height: 85vh; /* 高さもレスポンシブに */
+    box-sizing: border-box;
+    overflow: auto; /* テーブルがはみ出すのを防ぐ */
+}
+
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.preview-controls label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.preview-controls input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.preview-floor-tabs {
+    display: flex;
+    gap: 5px;
+}
+
+.preview-floor-tab {
+    padding: 8px 16px;
+    border: 2px solid #17a2b8;
+    background: white;
+    color: #17a2b8;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: bold;
+}
+
+.preview-floor-tab.active {
+    background: #17a2b8;
+    color: white;
+}
+
+.preview-floor-tab:hover:not(.active) {
+    background: #e3f2fd;
+}
+
+.preview-table-container {
+    max-height: 60vh; /* 高さをレスポンシブに */
+    overflow-x: auto; /* 横スクロールを明示的に有効に */
+    overflow-y: auto; /* 縦スクロールも有効に */
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    width: 100%; /* コンテナ幅を100%に */
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px; /* フォントサイズを小さくして全体を表示 */
+    table-layout: fixed; /* 固定レイアウトで均等に表示 */
+}
+
+.preview-table th,
+.preview-table td {
+    border: 1px solid #ddd;
+    padding: 4px 2px; /* パディングを小さくして幅を節約 */
+    text-align: center;
+    vertical-align: middle;
+    font-size: 9px; /* さらにフォントサイズを小さく */
+    white-space: nowrap; /* 改行を防ぐ */
+    overflow: hidden; /* はみ出した部分を隠す */
+    text-overflow: ellipsis; /* はみ出した場合に...を表示 */
+}
+
+.preview-table th {
+    background: #f8f9fa;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.preview-table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 11;
+    background: #f8f9fa;
+    min-width: 60px;
+}
+
+.preview-table td:first-child {
+    background: #f8f9fa;
+    font-weight: bold;
+    position: sticky;
+    left: 0;
+    z-index: 9;
+    min-width: 60px;
+}
+
+.preview-table .reserved-cell {
+    background: #ffcdd2;
+    color: #c62828;
+    font-weight: bold;
+}
+
+.preview-table .empty-cell {
+    background: white;
+}
+
+.preview-table .reservation-info {
+    font-size: 8px;
+    line-height: 1.2;
+    padding: 2px;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.preview-table .reservation-name {
+    font-weight: bold;
+    color: #d32f2f;
+    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-table .reservation-time {
+    color: #666;
+    font-size: 7px;
+    white-space: nowrap;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-button:hover {
     color: #333;
 }
 

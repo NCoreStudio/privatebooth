@@ -10,6 +10,8 @@ class BoothReservationApp {
         this.coursesUnsubscribe = null;
         this.editingLog = null;
         this.selectedSeats = new Set();
+        this.previewCurrentFloor = '6F';
+        this.previewCurrentDate = new Date().toISOString().split('T')[0];
         
         this.init();
     }
@@ -62,6 +64,11 @@ class BoothReservationApp {
             this.showAdminPanel();
         });
 
+        // プレビューボタン
+        document.getElementById('previewBtn').addEventListener('click', () => {
+            this.showPreviewModal();
+        });
+
         // サイドパネル
         document.getElementById('closeSidePanelBtn').addEventListener('click', () => {
             this.hideSidePanel();
@@ -71,6 +78,27 @@ class BoothReservationApp {
         document.getElementById('sideSubmitBtn').addEventListener('click', () => {
             console.log('Side submit button clicked'); // デバッグ用ログ
             this.submitReservation();
+        });
+
+        // プレビューモーダルのイベントリスナー
+        document.getElementById('closePreviewModalBtn').addEventListener('click', () => {
+            this.hidePreviewModal();
+        });
+
+        // プレビュー日付変更
+        document.getElementById('previewDate').addEventListener('change', (e) => {
+            this.previewCurrentDate = e.target.value;
+            this.generatePreviewTable();
+        });
+
+        // プレビューフロアタブ
+        document.querySelectorAll('.preview-floor-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.preview-floor-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                this.previewCurrentFloor = e.target.dataset.floor;
+                this.generatePreviewTable();
+            });
         });
 
         // 管理者パネル
@@ -162,6 +190,8 @@ class BoothReservationApp {
 
         // フロア変更時の席ボタン更新
         document.getElementById('adminFloorSelect').addEventListener('change', () => {
+            // フロア変更時は選択状態をクリアして重複を防ぐ
+            this.selectedSeats.clear();
             this.renderSeatPickButtons();
         });
     }
@@ -277,14 +307,22 @@ class BoothReservationApp {
     }
 
     updateSeatColors() {
-        const seatElements = document.querySelectorAll('.seat');
+        // すべての座席要素を取得して、現在のフロアの要素のみ処理する
+        const allSeatElements = document.querySelectorAll('.seat');
+        const currentFloorSeats = Array.from(allSeatElements).filter(element => 
+            element.className.includes(`seat-${this.currentFloor.toLowerCase()}-`)
+        );
         
-        seatElements.forEach(seatElement => {
+        console.log(`Updating seat colors for floor ${this.currentFloor}. Found ${currentFloorSeats.length} seat elements. Total reservations:`, this.reservations);
+        
+        currentFloorSeats.forEach(seatElement => {
             const seatNo = parseInt(seatElement.dataset.seat);
             // 現在のフロアの座席のみをフィルタリングして、6Fと7Fで同じ席番号が混在しないようにする
             const seatReservations = this.reservations.filter(r => 
                 r.seatNo === seatNo && r.floor === this.currentFloor
             );
+            
+            console.log(`Seat ${seatNo} on floor ${this.currentFloor}: ${seatReservations.length} reservations`);
             
             seatElement.classList.remove('reserved', 'selected');
             
@@ -414,6 +452,11 @@ class BoothReservationApp {
             
             this.resetSideForm();
             this.showToast('予約完了', 'success');
+            
+            // 予約完了後に座色を明示的に更新
+            setTimeout(() => {
+                this.updateSeatColors();
+            }, 100);
             
             // 成功メッセージ表示後に即座にパネルを閉じる
             setTimeout(() => {
@@ -770,6 +813,11 @@ class BoothReservationApp {
                 // 席選択状態をクリアしてボタン表示を更新
                 this.selectedSeats.clear();
                 this.renderSeatPickButtons();
+                
+                // 予約完了後に座色を明示的に更新
+                setTimeout(() => {
+                    this.updateSeatColors();
+                }, 100);
             }, 50); // 遅延を50msに短縮して即時性を向上
         } else {
             console.log('No successful reservations, keeping panel open'); // デバッグ用ログ
@@ -974,6 +1022,11 @@ class BoothReservationApp {
             // 席選択状態をクリアしてボタン表示を更新
             this.selectedSeats.clear();
             this.renderSeatPickButtons();
+            
+            // 予約完了後に座色を明示的に更新
+            setTimeout(() => {
+                this.updateSeatColors();
+            }, 100);
         }, 50); // 遅延を50msに短縮して即時性を向上
     }
 
@@ -1075,6 +1128,10 @@ class BoothReservationApp {
             this.unsubscribe();
         }
         
+        // 明示的に予約データをクリアしてフロア間のデータ混在を防ぐ
+        this.reservations = [];
+        console.log(`Subscribing to reservations for date: ${this.currentDate}, floor: ${this.currentFloor}`);
+        
         this.unsubscribe = reservationsCollection
             .where('date', '==', this.currentDate)
             .where('floor', '==', this.currentFloor)
@@ -1083,6 +1140,8 @@ class BoothReservationApp {
                     id: doc.id,
                     ...doc.data()
                 }));
+                
+                console.log(`Loaded ${this.reservations.length} reservations for floor ${this.currentFloor}:`, this.reservations);
                 
                 this.updateSeatColors();
                 this.renderReservationsList();
@@ -1099,8 +1158,10 @@ class BoothReservationApp {
         const container = document.getElementById('reservationsListContent');
         container.innerHTML = '';
         
-        // 選択されている座席の予約のみをフィルタリング
-        const seatReservations = this.reservations.filter(r => r.seatNo === this.selectedSeat);
+        // 選択されている座席の予約のみをフィルタリング（フロアも考慮）
+        const seatReservations = this.reservations.filter(r => 
+            r.seatNo === this.selectedSeat && r.floor === this.currentFloor
+        );
         
         if (seatReservations.length === 0) {
             container.innerHTML = '<p>この座席の予約がありません</p>';
@@ -1361,6 +1422,8 @@ class BoothReservationApp {
         const floorSelect = document.getElementById('adminFloorSelect');
         if (floorSelect && params.floor) {
             floorSelect.value = params.floor;
+            // フロア変更時は選択状態を一度クリア
+            this.selectedSeats.clear();
         }
         
         // 名前を設定
@@ -1608,14 +1671,151 @@ class BoothReservationApp {
         });
         
         await batch.commit();
-        console.log(`Created ${seats.length} new reservations`); // デバッグ用ログ
+        console.log(`Created ${seats.length} new reservations`);
     }
-    
-    showLogEditForm(logData, logId) {
-        // 編集中のログデータを保存
-        this.editingLogData = logData;
+
+    // プレビュー機能
+    showPreviewModal() {
+        console.log('showPreviewModal called');
+        this.previewCurrentDate = this.currentDate;
+        this.previewCurrentFloor = this.currentFloor;
         
-        // モーダルを作成
+        console.log('Current date:', this.previewCurrentDate);
+        console.log('Current floor:', this.previewCurrentFloor);
+        
+        // モーダルを表示
+        const previewModal = document.getElementById('previewModal');
+        previewModal.style.maxWidth = '100vw'; // 画面幅いっぱいに広げる
+        previewModal.style.width = 'fit-content'; // コンテンツに合わせて幅を自動調整
+        previewModal.classList.add('active');
+        
+        console.log('Modal added active class');
+        
+        // 日付とフロアを設定
+        document.getElementById('previewDate').value = this.previewCurrentDate;
+        
+        // フロアタブを設定
+        document.querySelectorAll('.preview-floor-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.dataset.floor === this.previewCurrentFloor) {
+                tab.classList.add('active');
+            }
+        });
+        
+        console.log('Floor tabs set up');
+        
+        // プレビューテーブルを生成
+        this.generatePreviewTable();
+    }
+
+    hidePreviewModal() {
+        document.getElementById('previewModal').classList.remove('active');
+    }
+
+    generatePreviewTable() {
+        console.log('generatePreviewTable called');
+        const timeHeaderRow = document.getElementById('timeHeaderRow');
+        const tableBody = document.getElementById('previewTableBody');
+        
+        console.log('Time header row:', timeHeaderRow);
+        console.log('Table body:', tableBody);
+        
+        // 時間ヘッダーを生成（9時〜21時）
+        timeHeaderRow.innerHTML = '<th>席番号</th>';
+        for (let hour = 9; hour <= 21; hour++) {
+            const th = document.createElement('th');
+            th.textContent = `${hour}:00`;
+            timeHeaderRow.appendChild(th);
+        }
+        
+        console.log('Time headers generated, count:', 21 - 9 + 1);
+        
+        // 予約データを取得
+        this.loadPreviewData();
+    }
+
+    async loadPreviewData() {
+        console.log('loadPreviewData called');
+        try {
+            const snapshot = await reservationsCollection
+                .where('date', '==', this.previewCurrentDate)
+                .where('floor', '==', this.previewCurrentFloor)
+                .get();
+            
+            const reservations = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            console.log('Reservations loaded:', reservations.length, reservations);
+            
+            this.renderPreviewTable(reservations);
+        } catch (error) {
+            console.error('プレビューデータ読み込みエラー:', error);
+            this.showToast('プレビューデータの読み込みに失敗しました', 'error');
+        }
+    }
+
+    renderPreviewTable(reservations) {
+        console.log('renderPreviewTable called with', reservations.length, 'reservations');
+        const tableBody = document.getElementById('previewTableBody');
+        const maxSeat = this.previewCurrentFloor === '6F' ? 30 : 19;
+        
+        console.log('Max seats:', maxSeat, 'for floor:', this.previewCurrentFloor);
+        
+        tableBody.innerHTML = '';
+        
+        for (let seatNo = 1; seatNo <= maxSeat; seatNo++) {
+            const row = document.createElement('tr');
+            
+            // 席番号セル
+            const seatCell = document.createElement('td');
+            seatCell.textContent = seatNo;
+            row.appendChild(seatCell);
+            
+            // 時間帯セル（9時〜21時）
+            for (let hour = 9; hour <= 21; hour++) {
+                const timeCell = document.createElement('td');
+                const hourMinutes = hour * 60;
+                
+                // この時間帯の予約を検索
+                const seatReservations = reservations.filter(r => 
+                    r.seatNo === seatNo && 
+                    r.startMin < (hour + 1) * 60 && 
+                    r.endMin > hour * 60
+                );
+                
+                if (seatReservations.length > 0) {
+                    timeCell.className = 'reserved-cell';
+                    const reservationInfo = document.createElement('div');
+                    reservationInfo.className = 'reservation-info';
+                    
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'reservation-name';
+                    nameDiv.textContent = seatReservations[0].name;
+                    
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'reservation-time';
+                    timeDiv.textContent = `${this.formatTime(seatReservations[0].startMin)}-${this.formatTime(seatReservations[0].endMin)}`;
+                    
+                    reservationInfo.appendChild(nameDiv);
+                    reservationInfo.appendChild(timeDiv);
+                    timeCell.appendChild(reservationInfo);
+                } else {
+                    timeCell.className = 'empty-cell';
+                }
+                
+                row.appendChild(timeCell);
+            }
+            
+            tableBody.appendChild(row);
+        }
+        
+        console.log('Table rendered with', maxSeat, 'rows');
+    }
+
+    // モーダルを作成
+    createLogEditModal(logId, logData) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'logEditModal';
