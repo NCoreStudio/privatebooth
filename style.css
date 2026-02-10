@@ -635,13 +635,13 @@ body {
 }
 
 .preview-table .reserved-cell {
-    background: #ffcdd2;
+    background: #ffcdd2; /* デフォルト色、動的設定で上書きされる */
     color: #c62828;
     font-weight: bold;
 }
 
 .preview-table .empty-cell {
-    background: white;
+    background: white; /* 空セルの背景色を明示的に設定 */
 }
 
 .preview-table .reservation-info {
@@ -655,7 +655,7 @@ body {
 
 .preview-table .reservation-name {
     font-weight: bold;
-    color: #d32f2f;
+    color: #000000; /* 黒文字に変更 */
     margin-bottom: 1px;
     white-space: nowrap;
     overflow: hidden;
@@ -954,8 +954,27 @@ body {
     background: white;
 }
 
-.course-item span {
+.course-info {
+    display: flex;
+    align-items: center;
     flex: 1;
+    gap: 8px;
+}
+
+.color-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+}
+
+.color-name {
+    color: #666;
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.course-item span {
     font-weight: 500;
 }
 

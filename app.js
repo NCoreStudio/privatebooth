@@ -183,6 +183,13 @@ class BoothReservationApp {
             });
         });
 
+        // サイドバーの目的タイプ変更
+        document.querySelectorAll('input[name="sidePurposeType"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.updateNoteTextarea('side', e.target.value);
+            });
+        });
+
         // コース管理
         document.getElementById('addCourseBtn').addEventListener('click', () => {
             this.addCourse();
@@ -324,10 +331,11 @@ class BoothReservationApp {
             
             console.log(`Seat ${seatNo} on floor ${this.currentFloor}: ${seatReservations.length} reservations`);
             
+            // すべての予約関連クラスを削除
             seatElement.classList.remove('reserved', 'selected');
+            seatElement.style.backgroundColor = '';
             
             if (seatReservations.length > 0) {
-                seatElement.classList.add('reserved');
                 const seatInfo = seatElement.querySelector('.seat-info');
                 if (seatInfo) {
                     if (seatReservations.length === 1) {
@@ -336,8 +344,23 @@ class BoothReservationApp {
                         seatInfo.textContent = seatReservations[0].name + 'ほか';
                     }
                 }
+                
+                // 最初の予約のコースに基づいて色を設定
+                const reservation = seatReservations[0];
+                if (reservation.course) {
+                    const course = this.courses.find(c => c.name === reservation.course);
+                    if (course && course.color) {
+                        seatElement.style.backgroundColor = course.color;
+                        seatElement.classList.add('reserved');
+                    } else {
+                        // コースが見つからない場合や色がない場合はデフォルトの赤色
+                        seatElement.classList.add('reserved');
+                    }
+                } else {
+                    // コースが設定されていない場合はデフォルトの赤色
+                    seatElement.classList.add('reserved');
+                }
             } else {
-                // 予約がない場合はseat-infoをクリア
                 const seatInfo = seatElement.querySelector('.seat-info');
                 if (seatInfo) {
                     seatInfo.textContent = '';
@@ -1050,8 +1073,20 @@ class BoothReservationApp {
         this.courses.forEach(course => {
             const courseItem = document.createElement('div');
             courseItem.className = 'course-item';
+            
+            // 色表示用の要素を作成
+            const colorDisplay = course.color ? 
+                `<span class="color-indicator" style="background-color: ${course.color}; width: 20px; height: 20px; display: inline-block; border-radius: 3px; margin-right: 8px;"></span>` : 
+                '';
+            
+            const colorName = course.colorName || '未設定';
+            
             courseItem.innerHTML = `
-                <span>${course.name}</span>
+                <div class="course-info">
+                    ${colorDisplay}
+                    <span>${course.name}</span>
+                    <span class="color-name">(${colorName})</span>
+                </div>
                 <div class="course-actions">
                     <button class="edit-btn" data-id="${course.id}">編集</button>
                     <button class="delete-btn" data-id="${course.id}">削除</button>
@@ -1080,17 +1115,45 @@ class BoothReservationApp {
     addCourse() {
         const courseName = prompt('コース名を入力してください:');
         if (courseName && courseName.trim()) {
-            const course = {
-                name: courseName.trim(),
-                createdAt: new Date()
-            };
+            // 色選択ダイアログを表示
+            const colors = [
+                { name: 'ピンク', value: '#FFC0CB' },
+                { name: '青', value: '#4169E1' },
+                { name: '赤', value: '#FF0000' },
+                { name: '水色', value: '#00CED1' },
+                { name: '黄色', value: '#FFD700' },
+                { name: '緑', value: '#32CD32' },
+                { name: '灰色', value: '#808080' }
+            ];
             
-            coursesCollection.add(course).then(() => {
-                this.showToast('コースを追加しました', 'success');
-            }).catch(error => {
-                console.error('コース追加エラー:', error);
-                this.showToast('コースの追加に失敗しました', 'error');
-            });
+            const colorOptions = colors.map((color, index) => 
+                `${index + 1}. ${color.name}`
+            ).join('\n');
+            
+            const colorChoice = prompt(`色を選択してください（番号を入力）:\n${colorOptions}`);
+            
+            if (colorChoice && colorChoice.trim()) {
+                const colorIndex = parseInt(colorChoice.trim()) - 1;
+                
+                if (colorIndex >= 0 && colorIndex < colors.length) {
+                    const selectedColor = colors[colorIndex];
+                    const course = {
+                        name: courseName.trim(),
+                        color: selectedColor.value,
+                        colorName: selectedColor.name,
+                        createdAt: new Date()
+                    };
+                    
+                    coursesCollection.add(course).then(() => {
+                        this.showToast(`コース「${course.name}」を追加しました（${selectedColor.name}）`, 'success');
+                    }).catch(error => {
+                        console.error('コース追加エラー:', error);
+                        this.showToast('コースの追加に失敗しました', 'error');
+                    });
+                } else {
+                    this.showToast('無効な色の選択です', 'error');
+                }
+            }
         }
     }
 
@@ -1787,6 +1850,30 @@ class BoothReservationApp {
                 
                 if (seatReservations.length > 0) {
                     timeCell.className = 'reserved-cell';
+                    
+                    // 予約のコースに基づいて色を設定
+                    const reservation = seatReservations[0];
+                    console.log('Reservation:', reservation);
+                    console.log('Available courses:', this.courses);
+                    
+                    if (reservation.course) {
+                        const course = this.courses.find(c => c.name === reservation.course);
+                        console.log('Found course:', course);
+                        
+                        if (course && course.color) {
+                            console.log('Setting color to:', course.color);
+                            timeCell.style.setProperty('background-color', course.color, 'important');
+                        } else {
+                            console.log('Course not found or no color, using default red');
+                            // コースが見つからない場合はデフォルトの赤色
+                            timeCell.style.setProperty('background-color', '#ffcdd2', 'important');
+                        }
+                    } else {
+                        console.log('No course in reservation, using default red');
+                        // コースが設定されていない場合はデフォルトの赤色
+                        timeCell.style.setProperty('background-color', '#ffcdd2', 'important');
+                    }
+                    
                     const reservationInfo = document.createElement('div');
                     reservationInfo.className = 'reservation-info';
                     
@@ -1803,6 +1890,7 @@ class BoothReservationApp {
                     timeCell.appendChild(reservationInfo);
                 } else {
                     timeCell.className = 'empty-cell';
+                    timeCell.style.setProperty('background-color', 'white', 'important');
                 }
                 
                 row.appendChild(timeCell);
