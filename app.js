@@ -281,7 +281,10 @@ class BoothReservationApp {
         
         seatElements.forEach(seatElement => {
             const seatNo = parseInt(seatElement.dataset.seat);
-            const seatReservations = this.reservations.filter(r => r.seatNo === seatNo);
+            // 現在のフロアの座席のみをフィルタリングして、6Fと7Fで同じ席番号が混在しないようにする
+            const seatReservations = this.reservations.filter(r => 
+                r.seatNo === seatNo && r.floor === this.currentFloor
+            );
             
             seatElement.classList.remove('reserved', 'selected');
             
