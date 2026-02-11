@@ -1244,6 +1244,7 @@ class BoothReservationApp {
                     ${reservation.course ? `(${reservation.course})` : ''}
                     <br>
                     <small>${startTime} - ${endTime}</small>
+                    ${reservation.note ? `<br><small class="note-text">準備物: ${reservation.note}</small>` : ''}
                 </div>
                 <button class="delete-btn" data-id="${reservation.id}">削除</button>
             `;

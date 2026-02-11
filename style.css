@@ -387,6 +387,14 @@ body {
     margin-top: 5px;
 }
 
+.note-text {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+    margin-top: 3px;
+    display: block;
+}
+
 .delete-btn {
     background: #dc3545;
     color: white;
