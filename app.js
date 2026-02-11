@@ -599,6 +599,13 @@ class BoothReservationApp {
         const floor = document.getElementById('adminFloorSelect').value;
         const maxSeat = floor === '6F' ? 30 : 19;
         
+        // フロアに応じてCSSクラスを設定
+        if (floor === '7F') {
+            container.classList.add('admin-floor-7f');
+        } else {
+            container.classList.remove('admin-floor-7f');
+        }
+        
         for (let i = 1; i <= maxSeat; i++) {
             const button = document.createElement('button');
             button.type = 'button';
