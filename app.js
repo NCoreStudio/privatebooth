@@ -1662,21 +1662,33 @@ class BoothReservationApp {
         console.log(`Updating reservations in transaction for date: ${date}, floor: ${floor}, seats: ${seats}`); // デバッグ用ログ
         
         try {
-            // まずトランザクション外で既存の予約を検索
+            // 元のログデータを取得
+            const originalLog = this.editingLog;
+            const originalParams = originalLog.params || {};
+            const originalDate = originalParams.date;
+            const originalFloor = originalParams.floor;
+            const originalSeats = originalParams.seats || [];
+            const originalStartMin = originalParams.startMin;
+            const originalEndMin = originalParams.endMin;
+            
+            console.log('Original reservation data:', { originalDate, originalFloor, originalSeats, originalStartMin, originalEndMin }); // デバッグ用ログ
+            
+            // まずトランザクション外で元の予約を検索
             const existingSnapshot = await reservationsCollection
-                .where('date', '==', date)
-                .where('floor', '==', floor)
-                .where('startMin', '==', startMin)
-                .where('endMin', '==', endMin)
+                .where('date', '==', originalDate)
+                .where('floor', '==', originalFloor)
+                .where('startMin', '==', originalStartMin)
+                .where('endMin', '==', originalEndMin)
+                .where('seatNo', 'in', originalSeats)
                 .get();
             
             console.log(`Found ${existingSnapshot.docs.length} existing reservations to delete`); // デバッグ用ログ
             
             // Firestoreトランザクションを使用して原子性を保証
             await db.runTransaction(async (transaction) => {
-                // 1. 既存の予約を削除
+                // 1. 元の予約を削除
                 existingSnapshot.docs.forEach(doc => {
-                    console.log(`Deleting reservation: ${doc.id}`); // デバッグ用ログ
+                    console.log(`Deleting original reservation: ${doc.id}, seat: ${doc.data().seatNo}`); // デバッグ用ログ
                     transaction.delete(doc.ref);
                 });
                 
@@ -1696,13 +1708,13 @@ class BoothReservationApp {
                         updatedAt: new Date()
                     };
                     
-                    console.log(`Creating reservation for seat: ${seatNo}`); // デバッグ用ログ
+                    console.log(`Creating new reservation for seat: ${seatNo}`); // デバッグ用ログ
                     const docRef = reservationsCollection.doc();
                     transaction.set(docRef, reservation);
                 });
             });
             
-            console.log(`Transaction completed: deleted existing reservations and created ${seats.length} new reservations`); // デバッグ用ログ
+            console.log(`Transaction completed: deleted ${existingSnapshot.docs.length} original reservations and created ${seats.length} new reservations`); // デバッグ用ログ
             
         } catch (error) {
             console.error('Transaction error:', error);
@@ -1827,9 +1839,9 @@ class BoothReservationApp {
         
         // 時間ヘッダーを生成（9時〜21時）
         timeHeaderRow.innerHTML = '<th>席番号</th>';
-        for (let hour = 9; hour <= 21; hour++) {
+        for (let hour = 9; hour < 21; hour++) {
             const th = document.createElement('th');
-            th.textContent = `${hour}:00`;
+            th.textContent = `${hour}:00~${hour + 1}:00`;
             timeHeaderRow.appendChild(th);
         }
         
@@ -1882,7 +1894,7 @@ class BoothReservationApp {
             
             // 時間帯セル（9時〜21時）
             let currentHour = 9;
-            while (currentHour <= 21) {
+            while (currentHour < 21) {
                 // この時間帯の予約を検索
                 const reservation = seatReservations.find(r => 
                     r.startMin < (currentHour + 1) * 60 && 
@@ -1914,69 +1926,26 @@ class BoothReservationApp {
                             mergedCell.style.setProperty('background-color', '#ffcdd2', 'important');
                         }
                         
-                        // 予約情報を中央寄せで表示
-                        const reservationInfo = document.createElement('div');
-                        reservationInfo.className = 'reservation-info';
-                        reservationInfo.style.textAlign = 'center';
-                        reservationInfo.style.verticalAlign = 'middle';
-                        reservationInfo.style.height = '100%';
-                        reservationInfo.style.display = 'flex';
-                        reservationInfo.style.flexDirection = 'column';
-                        reservationInfo.style.justifyContent = 'center';
-                        reservationInfo.style.alignItems = 'center';
-                        reservationInfo.style.padding = '4px';
-                        
-                        const nameDiv = document.createElement('div');
-                        nameDiv.className = 'reservation-name';
-                        nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
-                        nameDiv.style.fontWeight = 'bold';
-                        nameDiv.style.fontSize = '12px';
-                        
-                        // コース名を追加
-                        if (reservation.course) {
-                            const courseDiv = document.createElement('div');
-                            courseDiv.className = 'reservation-course';
-                            courseDiv.textContent = `(${reservation.course})`;
-                            courseDiv.style.fontSize = '10px';
-                            courseDiv.style.marginTop = '1px';
-                            reservationInfo.appendChild(courseDiv);
-                        }
-                        
-                        // 目的を追加（自習以外の場合）
-                        if (reservation.purposeType && reservation.purposeType !== '自習') {
-                            const purposeDiv = document.createElement('div');
-                            purposeDiv.className = 'reservation-purpose';
-                            purposeDiv.textContent = reservation.purposeType;
-                            purposeDiv.style.fontSize = '9px';
-                            purposeDiv.style.marginTop = '1px';
-                            reservationInfo.appendChild(purposeDiv);
-                        }
-                        
-                        const timeDiv = document.createElement('div');
-                        timeDiv.className = 'reservation-time';
-                        timeDiv.textContent = `${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}`;
-                        timeDiv.style.fontSize = '10px';
-                        timeDiv.style.marginTop = '2px';
-                        
-                        reservationInfo.appendChild(nameDiv);
-                        reservationInfo.appendChild(timeDiv);
-                        mergedCell.appendChild(reservationInfo);
-                        
+                        // 予約情報を表示
+                        this.renderReservationInfo(mergedCell, reservation);
                         row.appendChild(mergedCell);
                         
                         // 処理した時間分だけ進める
                         currentHour += duration;
                     } else {
-                        // 予約の途中なので、この時間は飛ばす
+                        // 空きセル
+                        const emptyCell = document.createElement('td');
+                        emptyCell.style.border = '1px solid #ddd';
+                        emptyCell.style.backgroundColor = '#f9f9f9';
+                        row.appendChild(emptyCell);
                         currentHour++;
                     }
                 } else {
                     // 空きセル
                     const emptyCell = document.createElement('td');
-                    emptyCell.className = 'empty-cell';
-                    emptyCell.style.setProperty('background-color', 'white', 'important');
+                    emptyCell.style.border = '1px solid #ddd';
+                    emptyCell.style.backgroundColor = '#f9f9f9';
                     row.appendChild(emptyCell);
-                    
                     currentHour++;
                 }
             }
@@ -1986,6 +1955,56 @@ class BoothReservationApp {
         
 // ...
         console.log('Table rendered with', maxSeat, 'rows');
+    }
+
+    renderReservationInfo(cell, reservation) {
+        // 予約情報を中央寄せで表示
+        const reservationInfo = document.createElement('div');
+        reservationInfo.className = 'reservation-info';
+        reservationInfo.style.textAlign = 'center';
+        reservationInfo.style.verticalAlign = 'middle';
+        reservationInfo.style.height = '100%';
+        reservationInfo.style.display = 'flex';
+        reservationInfo.style.flexDirection = 'column';
+        reservationInfo.style.justifyContent = 'center';
+        reservationInfo.style.alignItems = 'center';
+        reservationInfo.style.padding = '4px';
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'reservation-name';
+        nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
+        nameDiv.style.fontWeight = 'bold';
+        nameDiv.style.fontSize = '12px';
+        
+        // コース名を追加
+        if (reservation.course) {
+            const courseDiv = document.createElement('div');
+            courseDiv.className = 'reservation-course';
+            courseDiv.textContent = `(${reservation.course})`;
+            courseDiv.style.fontSize = '10px';
+            courseDiv.style.marginTop = '1px';
+            reservationInfo.appendChild(courseDiv);
+        }
+        
+        // 目的を追加（自習以外の場合）
+        if (reservation.purposeType && reservation.purposeType !== '自習') {
+            const purposeDiv = document.createElement('div');
+            purposeDiv.className = 'reservation-purpose';
+            purposeDiv.textContent = reservation.purposeType;
+            purposeDiv.style.fontSize = '9px';
+            purposeDiv.style.marginTop = '1px';
+            reservationInfo.appendChild(purposeDiv);
+        }
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'reservation-time';
+        timeDiv.textContent = `${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}`;
+        timeDiv.style.fontSize = '10px';
+        timeDiv.style.marginTop = '2px';
+        
+        reservationInfo.appendChild(nameDiv);
+        reservationInfo.appendChild(timeDiv);
+        cell.appendChild(reservationInfo);
     }
 
     // モーダルを作成
