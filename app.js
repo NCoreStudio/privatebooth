@@ -22,6 +22,7 @@ class BoothReservationApp {
         this.loadCourses();
         this.renderSeatLayout();
         this.subscribeToReservations();
+        this.setupModalDrag();
     }
 
     setupEventListeners() {
@@ -569,26 +570,22 @@ class BoothReservationApp {
         console.log('Hiding admin panel...'); // デバッグ用ログ
         
         const modal = document.getElementById('adminPanel');
+        const modalContent = modal.querySelector('.modal-content');
         if (modal) {
             modal.classList.remove('active');
-            // 強制的に非表示にする
-            modal.style.display = 'none';
-            modal.style.visibility = 'hidden';
-            modal.style.opacity = '0';
+            
+            // ドラッグ位置をリセット
+            if (modalContent) {
+                modalContent.style.position = '';
+                modalContent.style.left = '';
+                modalContent.style.top = '';
+                modalContent.style.margin = '';
+                modalContent.style.zIndex = '';
+                modalContent.style.transform = '';
+            }
             
             // 編集モードをリセット
             this.resetEditMode();
-            
-            setTimeout(() => {
-                modal.style.display = '';
-                modal.style.visibility = '';
-                modal.style.opacity = '';
-                console.log('Panel styles reset'); // デバッグ用ログ
-            }, 100);
-            
-            console.log('Admin panel hidden with force'); // デバッグ用ログ
-        } else {
-            console.error('Admin panel not found'); // デバッグ用ログ
         }
     }
 
@@ -1796,7 +1793,19 @@ class BoothReservationApp {
     }
 
     hidePreviewModal() {
-        document.getElementById('previewModal').classList.remove('active');
+        const modal = document.getElementById('previewModal');
+        const modalContent = modal.querySelector('.modal-content');
+        modal.classList.remove('active');
+        
+        // ドラッグ位置をリセット
+        if (modalContent) {
+            modalContent.style.position = '';
+            modalContent.style.left = '';
+            modalContent.style.top = '';
+            modalContent.style.margin = '';
+            modalContent.style.zIndex = '';
+            modalContent.style.transform = '';
+        }
     }
 
     generatePreviewTable() {
@@ -2076,6 +2085,79 @@ class BoothReservationApp {
         
         await batch.commit();
         console.log(`Deleted ${snapshot.docs.length} related reservations`); // デバッグ用ログ
+    }
+    
+    setupModalDrag() {
+        // モーダルコンテンツをドラッグ可能にする
+        const modalContents = document.querySelectorAll('.modal-content');
+        
+        modalContents.forEach(content => {
+            const header = content.querySelector('.modal-header');
+            if (!header) return;
+            
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+            let initialLeft = 0;
+            let initialTop = 0;
+            
+            header.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+            
+            function dragStart(e) {
+                // ボタン以外のヘッダー部分でのみドラッグ開始
+                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                    return;
+                }
+                
+                if (e.target === header || header.contains(e.target)) {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    
+                    // 現在の位置を取得
+                    const rect = content.getBoundingClientRect();
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+                    
+                    content.style.position = 'fixed';
+                    content.style.zIndex = '1001';
+                    content.style.left = initialLeft + 'px';
+                    content.style.top = initialTop + 'px';
+                    content.style.margin = '0';
+                    content.style.transform = 'none';
+                }
+            }
+            
+            function drag(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+                    
+                    const newLeft = initialLeft + deltaX;
+                    const newTop = initialTop + deltaY;
+                    
+                    // 画面外にも出せるように制限を緩和（一部のみ制限）
+                    const minX = -content.offsetWidth + 100; // 左側は少し見える範囲まで
+                    const minY = -content.offsetHeight + 50; // 上側はタイトルバーが見える範囲まで
+                    const maxX = window.innerWidth - 100; // 右側は少し見える範囲まで
+                    const maxY = window.innerHeight - 50; // 下側は少し見える範囲まで
+                    
+                    const finalLeft = Math.max(minX, Math.min(newLeft, maxX));
+                    const finalTop = Math.max(minY, Math.min(newTop, maxY));
+                    
+                    content.style.left = finalLeft + 'px';
+                    content.style.top = finalTop + 'px';
+                }
+            }
+            
+            function dragEnd(e) {
+                isDragging = false;
+            }
+        });
     }
 }
 

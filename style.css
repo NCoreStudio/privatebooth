@@ -474,10 +474,20 @@ body {
     align-items: center;
     padding: 20px;
     border-bottom: 1px solid #eee;
+    cursor: move;
+    user-select: none;
 }
 
 .modal-header h3 {
+    cursor: move;
+    user-select: none;
+    flex: 1;
     margin: 0;
+}
+
+.modal-header .close-btn {
+    cursor: pointer;
+    user-select: auto;
 }
 
 .modal-body {
