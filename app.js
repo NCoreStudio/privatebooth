@@ -1860,7 +1860,6 @@ class BoothReservationApp {
         console.log('Max seats:', maxSeat, 'for floor:', this.previewCurrentFloor);
         
         tableBody.innerHTML = '';
-        
         for (let seatNo = 1; seatNo <= maxSeat; seatNo++) {
             const row = document.createElement('tr');
             
@@ -1868,86 +1867,115 @@ class BoothReservationApp {
             const seatCell = document.createElement('td');
             seatCell.textContent = seatNo;
             row.appendChild(seatCell);
+
+            // この席の予約を取得
+            const seatReservations = reservations.filter(r => r.seatNo === seatNo);
             
             // 時間帯セル（9時〜21時）
-            for (let hour = 9; hour <= 21; hour++) {
-                const timeCell = document.createElement('td');
-                const hourMinutes = hour * 60;
-                
+            let currentHour = 9;
+            while (currentHour <= 21) {
                 // この時間帯の予約を検索
-                const seatReservations = reservations.filter(r => 
-                    r.seatNo === seatNo && 
-                    r.startMin < (hour + 1) * 60 && 
-                    r.endMin > hour * 60
+                const reservation = seatReservations.find(r => 
+                    r.startMin < (currentHour + 1) * 60 && 
+                    r.endMin > currentHour * 60
                 );
                 
-                if (seatReservations.length > 0) {
-                    timeCell.className = 'reserved-cell';
-                    
-                    // 予約のコースに基づいて色を設定
-                    const reservation = seatReservations[0];
-                    console.log('Reservation:', reservation);
-                    console.log('Available courses:', this.courses);
-                    
-                    if (reservation.course) {
-                        const course = this.courses.find(c => c.name === reservation.course);
-                        console.log('Found course:', course);
+                if (reservation) {
+                    // 予約の開始時間かチェック
+                    if (reservation.startMin <= currentHour * 60) {
+                        // 予約の開始なので、継続時間を計算
+                        const startHour = Math.floor(reservation.startMin / 60);
+                        const endHour = Math.ceil(reservation.endMin / 60);
+                        const duration = endHour - startHour;
                         
-                        if (course && course.color) {
-                            console.log('Setting color to:', course.color);
-                            timeCell.style.setProperty('background-color', course.color, 'important');
+                        // 結合セルを作成
+                        const mergedCell = document.createElement('td');
+                        mergedCell.className = 'reserved-cell';
+                        mergedCell.colSpan = duration;
+                        
+                        // 予約の色を設定
+                        if (reservation.course) {
+                            const course = this.courses.find(c => c.name === reservation.course);
+                            if (course && course.color) {
+                                mergedCell.style.setProperty('background-color', course.color, 'important');
+                            } else {
+                                mergedCell.style.setProperty('background-color', '#ffcdd2', 'important');
+                            }
                         } else {
-                            console.log('Course not found or no color, using default red');
-                            // コースが見つからない場合はデフォルトの赤色
-                            timeCell.style.setProperty('background-color', '#ffcdd2', 'important');
+                            mergedCell.style.setProperty('background-color', '#ffcdd2', 'important');
                         }
+                        
+                        // 予約情報を中央寄せで表示
+                        const reservationInfo = document.createElement('div');
+                        reservationInfo.className = 'reservation-info';
+                        reservationInfo.style.textAlign = 'center';
+                        reservationInfo.style.verticalAlign = 'middle';
+                        reservationInfo.style.height = '100%';
+                        reservationInfo.style.display = 'flex';
+                        reservationInfo.style.flexDirection = 'column';
+                        reservationInfo.style.justifyContent = 'center';
+                        reservationInfo.style.alignItems = 'center';
+                        reservationInfo.style.padding = '4px';
+                        
+                        const nameDiv = document.createElement('div');
+                        nameDiv.className = 'reservation-name';
+                        nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
+                        nameDiv.style.fontWeight = 'bold';
+                        nameDiv.style.fontSize = '12px';
+                        
+                        // コース名を追加
+                        if (reservation.course) {
+                            const courseDiv = document.createElement('div');
+                            courseDiv.className = 'reservation-course';
+                            courseDiv.textContent = `(${reservation.course})`;
+                            courseDiv.style.fontSize = '10px';
+                            courseDiv.style.marginTop = '1px';
+                            reservationInfo.appendChild(courseDiv);
+                        }
+                        
+                        // 目的を追加（自習以外の場合）
+                        if (reservation.purposeType && reservation.purposeType !== '自習') {
+                            const purposeDiv = document.createElement('div');
+                            purposeDiv.className = 'reservation-purpose';
+                            purposeDiv.textContent = reservation.purposeType;
+                            purposeDiv.style.fontSize = '9px';
+                            purposeDiv.style.marginTop = '1px';
+                            reservationInfo.appendChild(purposeDiv);
+                        }
+                        
+                        const timeDiv = document.createElement('div');
+                        timeDiv.className = 'reservation-time';
+                        timeDiv.textContent = `${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}`;
+                        timeDiv.style.fontSize = '10px';
+                        timeDiv.style.marginTop = '2px';
+                        
+                        reservationInfo.appendChild(nameDiv);
+                        reservationInfo.appendChild(timeDiv);
+                        mergedCell.appendChild(reservationInfo);
+                        
+                        row.appendChild(mergedCell);
+                        
+                        // 処理した時間分だけ進める
+                        currentHour += duration;
                     } else {
-                        console.log('No course in reservation, using default red');
-                        // コースが設定されていない場合はデフォルトの赤色
-                        timeCell.style.setProperty('background-color', '#ffcdd2', 'important');
+                        // 予約の途中なので、この時間は飛ばす
+                        currentHour++;
                     }
-                    
-                    const reservationInfo = document.createElement('div');
-                    reservationInfo.className = 'reservation-info';
-                    
-                    const nameDiv = document.createElement('div');
-                    nameDiv.className = 'reservation-name';
-                    nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
-                    
-                    // コース名を追加
-                    if (reservation.course) {
-                        const courseDiv = document.createElement('div');
-                        courseDiv.className = 'reservation-course';
-                        courseDiv.textContent = `(${reservation.course})`;
-                        reservationInfo.appendChild(courseDiv);
-                    }
-                    
-                    // 目的を追加（自習以外の場合）
-                    if (reservation.purposeType && reservation.purposeType !== '自習') {
-                        const purposeDiv = document.createElement('div');
-                        purposeDiv.className = 'reservation-purpose';
-                        purposeDiv.textContent = reservation.purposeType;
-                        reservationInfo.appendChild(purposeDiv);
-                    }
-                    
-                    const timeDiv = document.createElement('div');
-                    timeDiv.className = 'reservation-time';
-                    timeDiv.textContent = `${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}`;
-                    
-                    reservationInfo.appendChild(nameDiv);
-                    reservationInfo.appendChild(timeDiv);
-                    timeCell.appendChild(reservationInfo);
                 } else {
-                    timeCell.className = 'empty-cell';
-                    timeCell.style.setProperty('background-color', 'white', 'important');
+                    // 空きセル
+                    const emptyCell = document.createElement('td');
+                    emptyCell.className = 'empty-cell';
+                    emptyCell.style.setProperty('background-color', 'white', 'important');
+                    row.appendChild(emptyCell);
+                    
+                    currentHour++;
                 }
-                
-                row.appendChild(timeCell);
             }
             
             tableBody.appendChild(row);
         }
         
+// ...
         console.log('Table rendered with', maxSeat, 'rows');
     }
 
