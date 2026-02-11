@@ -339,7 +339,23 @@ class BoothReservationApp {
                 const seatInfo = seatElement.querySelector('.seat-info');
                 if (seatInfo) {
                     if (seatReservations.length === 1) {
-                        seatInfo.textContent = seatReservations[0].name;
+                        const reservation = seatReservations[0];
+                        
+                        // 名前の部分にマーカーを適用
+                        const nameWithMarker = `<span class="name-with-marker">${reservation.name}</span>`;
+                        let displayText = nameWithMarker;
+                        
+                        // コース名を追加
+                        if (reservation.course) {
+                            displayText += `\n(${reservation.course})`;
+                        }
+                        
+                        // 目的を追加
+                        if (reservation.purposeType && reservation.purposeType !== '自習') {
+                            displayText += `\n${reservation.purposeType}`;
+                        }
+                        
+                        seatInfo.innerHTML = displayText;
                     } else {
                         seatInfo.textContent = seatReservations[0].name + 'ほか';
                     }
@@ -1880,11 +1896,27 @@ class BoothReservationApp {
                     
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'reservation-name';
-                    nameDiv.textContent = seatReservations[0].name;
+                    nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
+                    
+                    // コース名を追加
+                    if (reservation.course) {
+                        const courseDiv = document.createElement('div');
+                        courseDiv.className = 'reservation-course';
+                        courseDiv.textContent = `(${reservation.course})`;
+                        reservationInfo.appendChild(courseDiv);
+                    }
+                    
+                    // 目的を追加（自習以外の場合）
+                    if (reservation.purposeType && reservation.purposeType !== '自習') {
+                        const purposeDiv = document.createElement('div');
+                        purposeDiv.className = 'reservation-purpose';
+                        purposeDiv.textContent = reservation.purposeType;
+                        reservationInfo.appendChild(purposeDiv);
+                    }
                     
                     const timeDiv = document.createElement('div');
                     timeDiv.className = 'reservation-time';
-                    timeDiv.textContent = `${this.formatTime(seatReservations[0].startMin)}-${this.formatTime(seatReservations[0].endMin)}`;
+                    timeDiv.textContent = `${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}`;
                     
                     reservationInfo.appendChild(nameDiv);
                     reservationInfo.appendChild(timeDiv);
