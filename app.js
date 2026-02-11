@@ -1387,12 +1387,18 @@ class BoothReservationApp {
         const container = document.getElementById('logsList');
         container.innerHTML = '';
         
-        if (logs.length === 0) {
-            container.innerHTML = '<p>ログがありません</p>';
+        // 成功したログのみフィルタリング（successCount > 0 かつ failCount === 0）
+        const successfulLogs = logs.filter(log => {
+            const summary = log.summary || { successCount: 0, failCount: 0 };
+            return summary.successCount > 0 && summary.failCount === 0;
+        });
+        
+        if (successfulLogs.length === 0) {
+            container.innerHTML = '<p>成功したログがありません</p>';
             return;
         }
         
-        logs.forEach(log => {
+        successfulLogs.forEach(log => {
             const logItem = document.createElement('div');
             logItem.className = 'log-item';
             
@@ -1409,13 +1415,16 @@ class BoothReservationApp {
                     <span class="log-type">${log.type || 'bulk'}</span>
                 </div>
                 <div class="log-summary">
-                    成功: ${summary.successCount || 0}件 / 失敗: ${summary.failCount || 0}件
+                    成功: ${summary.successCount || 0}件
                 </div>
                 <div class="log-details">
                     日付: ${params.date || '未設定'} | 
                     フロア: ${params.floor || '未設定'} | 
                     席: ${(params.seats || []).join(', ') || '未設定'} | 
-                    時間: ${this.formatTime(params.startMin || 0)}-${this.formatTime(params.endMin || 0)}
+                    時間: ${this.formatTime(params.startMin || 0)}-${this.formatTime(params.endMin || 0)}<br>
+                    予約名: ${params.name || '未設定'} | 
+                    コース: ${params.course || '未設定'} | 
+                    目的: ${params.purposeType || '未設定'}
                 </div>
                 <div class="log-actions">
                     <button class="edit-log-btn" data-id="${log.id}">編集</button>
