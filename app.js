@@ -1266,12 +1266,26 @@ class BoothReservationApp {
                     <small>${startTime} - ${endTime}</small>
                     ${reservation.note ? `<br><small class="note-text">準備物: ${reservation.note}</small>` : ''}
                 </div>
-                <button class="delete-btn" data-id="${reservation.id}">削除</button>
+                <div class="reservation-actions">
+                    <button class="edit-reservation-btn" data-id="${reservation.id}">編集</button>
+                    <button class="delete-btn" data-id="${reservation.id}">削除</button>
+                </div>
             `;
             
             container.appendChild(item);
         });
         
+        // 編集ボタンのイベントリスナー
+        container.querySelectorAll('.edit-reservation-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reservationId = e.target.dataset.id;
+                const reservation = this.reservations.find(r => r.id === reservationId);
+                if (reservation) {
+                    this.editReservationFromSidebar(reservation);
+                }
+            });
+        });
+
         // 削除ボタンのイベントリスナー
         container.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -1280,6 +1294,108 @@ class BoothReservationApp {
             });
         });
 
+    }
+
+    editReservationFromSidebar(reservation) {
+        // 既存のモーダルを削除
+        const existingModal = document.getElementById('editReservationModal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'editReservationModal';
+
+        // コース選択肢を生成
+        const courseOptions = this.courses.map(c =>
+            `<option value="${c.name}" ${reservation.course === c.name ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
+
+        // 時間選択肢を生成
+        let startOptions = '';
+        let endOptions = '';
+        for (let m = 9 * 60; m <= 21 * 60; m += 30) {
+            const t = this.formatTime(m);
+            startOptions += `<option value="${m}" ${reservation.startMin === m ? 'selected' : ''}>${t}</option>`;
+            endOptions += `<option value="${m}" ${reservation.endMin === m ? 'selected' : ''}>${t}</option>`;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:420px;">
+                <div class="modal-header">
+                    <h3>予約編集 - 席 ${reservation.seatNo}</h3>
+                    <button class="close-btn" onclick="document.getElementById('editReservationModal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>名前</label>
+                        <input type="text" id="editResName" value="${reservation.name}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>コース</label>
+                        <select id="editResCourse">
+                            <option value="">選択してください</option>
+                            ${courseOptions}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>目的</label>
+                        <div>
+                            <label><input type="radio" name="editResPurpose" value="自習" ${reservation.purposeType === '自習' ? 'checked' : ''}> 自習</label>
+                            <label style="margin-left:10px;"><input type="radio" name="editResPurpose" value="補講" ${reservation.purposeType === '補講' ? 'checked' : ''}> 補講</label>
+                            <label style="margin-left:10px;"><input type="radio" name="editResPurpose" value="その他" ${reservation.purposeType === 'その他' ? 'checked' : ''}> その他</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>備考</label>
+                        <textarea id="editResNote">${reservation.note || ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>開始時刻</label>
+                        <select id="editResStart">${startOptions}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>終了時刻</label>
+                        <select id="editResEnd">${endOptions}</select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="submit-btn" onclick="app.saveReservationEdit('${reservation.id}')">保存</button>
+                    <button class="cancel-btn" onclick="document.getElementById('editReservationModal').remove()">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    }
+
+    async saveReservationEdit(reservationId) {
+        const name = document.getElementById('editResName').value.trim();
+        const course = document.getElementById('editResCourse').value;
+        const purposeType = document.querySelector('input[name="editResPurpose"]:checked').value;
+        const note = document.getElementById('editResNote').value.trim();
+        const startMin = parseInt(document.getElementById('editResStart').value);
+        const endMin = parseInt(document.getElementById('editResEnd').value);
+
+        if (!name) {
+            this.showToast('名前を入力してください', 'error');
+            return;
+        }
+        if (startMin >= endMin) {
+            this.showToast('終了時刻は開始時刻より後にしてください', 'error');
+            return;
+        }
+
+        try {
+            await reservationsCollection.doc(reservationId).update({
+                name, course: course || '', purposeType, note: note || '',
+                startMin, endMin, updatedAt: new Date()
+            });
+            this.showToast('予約を更新しました', 'success');
+            document.getElementById('editReservationModal').remove();
+        } catch (error) {
+            console.error('予約更新エラー:', error);
+            this.showToast('予約の更新に失敗しました', 'error');
+        }
     }
 
     showSidePanel(seatNo) {
@@ -1837,15 +1953,16 @@ class BoothReservationApp {
         console.log('Time header row:', timeHeaderRow);
         console.log('Table body:', tableBody);
         
-        // 時間ヘッダーを生成（9時〜21時）
+        // 時間ヘッダーを生成（9時〜21時、各列はcolspan=2で30分×2）
         timeHeaderRow.innerHTML = '<th>席番号</th>';
         for (let hour = 9; hour < 21; hour++) {
             const th = document.createElement('th');
             th.textContent = `${hour}:00~${hour + 1}:00`;
+            th.colSpan = 2; // 各時間を30分×2のハーフセルで表現
             timeHeaderRow.appendChild(th);
         }
         
-        console.log('Time headers generated, count:', 21 - 9 + 1);
+        console.log('Time headers generated, count:', 21 - 9);
         
         // 予約データを取得
         this.loadPreviewData();
@@ -1880,6 +1997,12 @@ class BoothReservationApp {
         
         console.log('Max seats:', maxSeat, 'for floor:', this.previewCurrentFloor);
         
+        // 全体は9:00〜21:00 = 24スロット（30分単位）
+        const SLOT_START = 9 * 60;   // 540分
+        const SLOT_END = 21 * 60;    // 1260分
+        const SLOT_SIZE = 30;
+        const TOTAL_SLOTS = (SLOT_END - SLOT_START) / SLOT_SIZE; // 24スロット
+
         tableBody.innerHTML = '';
         for (let seatNo = 1; seatNo <= maxSeat; seatNo++) {
             const row = document.createElement('tr');
@@ -1892,28 +2015,32 @@ class BoothReservationApp {
             // この席の予約を取得
             const seatReservations = reservations.filter(r => r.seatNo === seatNo);
             
-            // 時間帯セル（9時〜21時）
-            let currentHour = 9;
-            while (currentHour < 21) {
-                // この時間帯の予約を検索
-                const reservation = seatReservations.find(r => 
-                    r.startMin < (currentHour + 1) * 60 && 
-                    r.endMin > currentHour * 60
+            // 30分スロット単位で描画
+            let slot = 0; // 0〜23
+            while (slot < TOTAL_SLOTS) {
+                const slotStartMin = SLOT_START + slot * SLOT_SIZE;
+                const slotEndMin = slotStartMin + SLOT_SIZE;
+
+                // このスロットに重なる予約を検索
+                const reservation = seatReservations.find(r =>
+                    r.startMin < slotEndMin && r.endMin > slotStartMin
                 );
-                
+
                 if (reservation) {
-                    // 予約の開始時間かチェック
-                    if (reservation.startMin <= currentHour * 60) {
-                        // 予約の開始なので、継続時間を計算
-                        const startHour = Math.floor(reservation.startMin / 60);
-                        const endHour = Math.ceil(reservation.endMin / 60);
-                        const duration = endHour - startHour;
-                        
-                        // 結合セルを作成
+                    // この予約の開始スロットを計算
+                    const resStartSlot = Math.ceil((reservation.startMin - SLOT_START) / SLOT_SIZE);
+                    
+                    if (slot === resStartSlot || (slot < resStartSlot && reservation.startMin < slotEndMin)) {
+                        // 予約の描画開始
+                        // 実際の開始スロット（startMinが:30始まりならそのスロットから）
+                        const actualStartSlot = Math.floor((reservation.startMin - SLOT_START) / SLOT_SIZE);
+                        const actualEndSlot = Math.ceil((reservation.endMin - SLOT_START) / SLOT_SIZE);
+                        const spanSlots = actualEndSlot - actualStartSlot;
+
                         const mergedCell = document.createElement('td');
                         mergedCell.className = 'reserved-cell';
-                        mergedCell.colSpan = duration;
-                        
+                        mergedCell.colSpan = spanSlots;
+
                         // 予約の色を設定
                         if (reservation.course) {
                             const course = this.courses.find(c => c.name === reservation.course);
@@ -1930,30 +2057,28 @@ class BoothReservationApp {
                         this.renderReservationInfo(mergedCell, reservation);
                         row.appendChild(mergedCell);
                         
-                        // 処理した時間分だけ進める
-                        currentHour += duration;
+                        slot = actualEndSlot;
                     } else {
-                        // 空きセル
+                        // 空きスロット（予約が途中から始まる前の隙間）
                         const emptyCell = document.createElement('td');
                         emptyCell.style.border = '1px solid #ddd';
                         emptyCell.style.backgroundColor = '#f9f9f9';
                         row.appendChild(emptyCell);
-                        currentHour++;
+                        slot++;
                     }
                 } else {
-                    // 空きセル
+                    // 空きスロット
                     const emptyCell = document.createElement('td');
                     emptyCell.style.border = '1px solid #ddd';
                     emptyCell.style.backgroundColor = '#f9f9f9';
                     row.appendChild(emptyCell);
-                    currentHour++;
+                    slot++;
                 }
             }
             
             tableBody.appendChild(row);
         }
         
-// ...
         console.log('Table rendered with', maxSeat, 'rows');
     }
 

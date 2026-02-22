@@ -390,6 +390,31 @@ body {
     border-radius: 5px;
     padding: 10px;
     margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.reservation-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.edit-reservation-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.edit-reservation-btn:hover {
+    background: #0056b3;
 }
 
 .reservation-time {
@@ -639,6 +664,14 @@ body {
     border-collapse: collapse;
     font-size: 12px; /* フォントサイズを大きく */
     table-layout: fixed;
+}
+
+/* 各30分ハーフセルの幅 */
+.preview-table td.half-cell,
+.preview-table td.reserved-cell,
+.preview-table td.empty-half-cell {
+    min-width: 30px;
+    width: 30px;
 }
 
 .preview-table th,
