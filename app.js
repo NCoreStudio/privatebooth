@@ -2323,6 +2323,7 @@ class BoothReservationApp {
         nameDiv.innerHTML = `<span class="name-with-marker">${reservation.name}</span>`;
         nameDiv.style.fontWeight = 'bold';
         nameDiv.style.fontSize = '12px';
+        reservationInfo.appendChild(nameDiv);
         
         // コース名を追加
         if (reservation.course) {
@@ -2343,6 +2344,21 @@ class BoothReservationApp {
             purposeDiv.style.marginTop = '1px';
             reservationInfo.appendChild(purposeDiv);
         }
+
+        // 準備物を追加（補講かつnoteがある場合）
+        if (reservation.purposeType === '補講' && reservation.note) {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'reservation-note';
+            noteDiv.textContent = `📋 ${reservation.note}`;
+            noteDiv.style.fontSize = '9px';
+            noteDiv.style.marginTop = '2px';
+            noteDiv.style.color = '#555';
+            noteDiv.style.fontStyle = 'italic';
+            noteDiv.style.whiteSpace = 'pre-wrap';
+            noteDiv.style.wordBreak = 'break-all';
+            noteDiv.style.textAlign = 'left';
+            reservationInfo.appendChild(noteDiv);
+        }
         
         const timeDiv = document.createElement('div');
         timeDiv.className = 'reservation-time';
@@ -2350,7 +2366,6 @@ class BoothReservationApp {
         timeDiv.style.fontSize = '10px';
         timeDiv.style.marginTop = '2px';
         
-        reservationInfo.appendChild(nameDiv);
         reservationInfo.appendChild(timeDiv);
         cell.appendChild(reservationInfo);
     }
