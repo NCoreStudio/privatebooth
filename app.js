@@ -250,21 +250,15 @@ class BoothReservationApp {
                 ...doc.data()
             }));
             
-            // コース選択肢を更新
-            const sideSelect = document.getElementById('sideCourseSelect');
-            const adminSelect = document.getElementById('adminCourseSelect');
-            
-            [sideSelect, adminSelect].forEach(select => {
-                if (select) {
-                    select.innerHTML = '<option value="">選択してください</option>';
-                    this.courses.forEach(course => {
-                        const option = document.createElement('option');
-                        option.value = course.name;
-                        option.textContent = course.name;
-                        select.appendChild(option);
-                    });
-                }
+            // order フィールドでソート（未設定は末尾）
+            this.courses.sort((a, b) => {
+                const aOrder = a.order !== undefined ? a.order : 9999;
+                const bOrder = b.order !== undefined ? b.order : 9999;
+                return aOrder - bOrder;
             });
+            
+            // カスタムコース選択UIを更新
+            this.updateCourseSelects();
             
             // コース管理タブが表示されている場合は一覧を更新
             const coursesTab = document.getElementById('coursesTab');
@@ -272,6 +266,114 @@ class BoothReservationApp {
                 this.renderCoursesList();
             }
         });
+    }
+
+    updateCourseSelects() {
+        const selectTargets = [
+            { containerId: 'sideCourseSelectContainer', hiddenId: 'sideCourseSelect' },
+            { containerId: 'adminCourseSelectContainer', hiddenId: 'adminCourseSelect' },
+        ];
+
+        selectTargets.forEach(({ containerId, hiddenId }) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const currentValue = container.querySelector('input[type="hidden"]')?.value || '';
+            container.innerHTML = '';
+
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.id = hiddenId;
+            hidden.value = currentValue;
+            container.appendChild(hidden);
+
+            const trigger = document.createElement('div');
+            trigger.className = 'custom-select-trigger';
+            trigger.setAttribute('tabindex', '0');
+
+            const dropdown = document.createElement('div');
+            dropdown.className = 'custom-select-dropdown';
+
+            const renderTrigger = (courseName) => {
+                trigger.innerHTML = '';
+                const course = this.courses.find(c => c.name === courseName);
+                if (course && course.color) {
+                    const swatch = document.createElement('span');
+                    swatch.className = 'select-color-swatch';
+                    swatch.style.backgroundColor = course.color;
+                    trigger.appendChild(swatch);
+                }
+                const label = document.createElement('span');
+                label.textContent = courseName || '選択してください';
+                label.style.color = courseName ? '' : '#999';
+                trigger.appendChild(label);
+                const arrow = document.createElement('span');
+                arrow.className = 'custom-select-arrow';
+                arrow.textContent = '▾';
+                trigger.appendChild(arrow);
+            };
+
+            renderTrigger(currentValue);
+
+            const emptyOpt = document.createElement('div');
+            emptyOpt.className = 'custom-select-option';
+            emptyOpt.textContent = '選択してください';
+            emptyOpt.style.color = '#999';
+            emptyOpt.addEventListener('click', () => {
+                hidden.value = '';
+                renderTrigger('');
+                dropdown.classList.remove('open');
+                trigger.classList.remove('open');
+            });
+            dropdown.appendChild(emptyOpt);
+
+            this.courses.forEach(course => {
+                const opt = document.createElement('div');
+                opt.className = 'custom-select-option';
+                if (course.color) {
+                    const swatch = document.createElement('span');
+                    swatch.className = 'select-color-swatch';
+                    swatch.style.backgroundColor = course.color;
+                    opt.appendChild(swatch);
+                }
+                const name = document.createElement('span');
+                name.textContent = course.name;
+                opt.appendChild(name);
+                opt.addEventListener('click', () => {
+                    hidden.value = course.name;
+                    renderTrigger(course.name);
+                    dropdown.classList.remove('open');
+                    trigger.classList.remove('open');
+                });
+                dropdown.appendChild(opt);
+            });
+
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = dropdown.classList.contains('open');
+                document.querySelectorAll('.custom-select-dropdown.open').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.custom-select-trigger.open').forEach(t => t.classList.remove('open'));
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                    trigger.classList.add('open');
+                }
+            });
+
+            trigger.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') trigger.click();
+            });
+
+            container.appendChild(trigger);
+            container.appendChild(dropdown);
+        });
+
+        if (!this._globalSelectCloseRegistered) {
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.custom-select-dropdown.open').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.custom-select-trigger.open').forEach(t => t.classList.remove('open'));
+            });
+            this._globalSelectCloseRegistered = true;
+        }
     }
 
     renderSeatLayout() {
@@ -1090,18 +1192,22 @@ class BoothReservationApp {
         const container = document.getElementById('coursesList');
         container.innerHTML = '';
         
-        this.courses.forEach(course => {
+        this.courses.forEach((course, index) => {
             const courseItem = document.createElement('div');
             courseItem.className = 'course-item';
             
-            // 色表示用の要素を作成
             const colorDisplay = course.color ? 
-                `<span class="color-indicator" style="background-color: ${course.color}; width: 20px; height: 20px; display: inline-block; border-radius: 3px; margin-right: 8px;"></span>` : 
+                `<span class="color-indicator" style="background-color: ${course.color};"></span>` : 
                 '';
-            
             const colorName = course.colorName || '未設定';
+            const isFirst = index === 0;
+            const isLast = index === this.courses.length - 1;
             
             courseItem.innerHTML = `
+                <div class="course-order-btns">
+                    <button class="move-up-btn" data-id="${course.id}" ${isFirst ? 'disabled' : ''} title="上へ">▲</button>
+                    <button class="move-down-btn" data-id="${course.id}" ${isLast ? 'disabled' : ''} title="下へ">▼</button>
+                </div>
                 <div class="course-info">
                     ${colorDisplay}
                     <span>${course.name}</span>
@@ -1130,6 +1236,45 @@ class BoothReservationApp {
                 this.deleteCourse(courseId);
             });
         });
+
+        container.querySelectorAll('.move-up-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const courseId = e.target.dataset.id;
+                this.moveCourse(courseId, -1);
+            });
+        });
+
+        container.querySelectorAll('.move-down-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const courseId = e.target.dataset.id;
+                this.moveCourse(courseId, 1);
+            });
+        });
+    }
+
+    async moveCourse(courseId, direction) {
+        const index = this.courses.findIndex(c => c.id === courseId);
+        if (index === -1) return;
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= this.courses.length) return;
+
+        // ローカルで並び替え
+        const newOrder = [...this.courses];
+        [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+
+        // Firestoreにorder値を保存（バッチ書き込み）
+        try {
+            const batch = db.batch();
+            newOrder.forEach((course, i) => {
+                const ref = coursesCollection.doc(course.id);
+                batch.update(ref, { order: i });
+            });
+            await batch.commit();
+            this.showToast('順番を更新しました', 'success');
+        } catch (error) {
+            console.error('順番更新エラー:', error);
+            this.showToast('順番の更新に失敗しました', 'error');
+        }
     }
 
     addCourse() {
@@ -1161,6 +1306,7 @@ class BoothReservationApp {
                         name: courseName.trim(),
                         color: selectedColor.value,
                         colorName: selectedColor.name,
+                        order: this.courses.length,
                         createdAt: new Date()
                     };
                     
@@ -1305,10 +1451,7 @@ class BoothReservationApp {
         modal.className = 'modal active';
         modal.id = 'editReservationModal';
 
-        // コース選択肢を生成
-        const courseOptions = this.courses.map(c =>
-            `<option value="${c.name}" ${reservation.course === c.name ? 'selected' : ''}>${c.name}</option>`
-        ).join('');
+        // コース選択肢はモーダル追加後にJSで生成
 
         // 時間選択肢を生成
         let startOptions = '';
@@ -1332,10 +1475,9 @@ class BoothReservationApp {
                     </div>
                     <div class="form-group">
                         <label>コース</label>
-                        <select id="editResCourse">
-                            <option value="">選択してください</option>
-                            ${courseOptions}
-                        </select>
+                        <div id="editResCourseContainer" class="custom-select-container">
+                            <input type="hidden" id="editResCourse" value="${reservation.course || ''}">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>目的</label>
@@ -1366,6 +1508,85 @@ class BoothReservationApp {
         `;
 
         document.body.appendChild(modal);
+
+        // editResCourse カスタムセレクト初期化
+        const editContainer = document.getElementById('editResCourseContainer');
+        if (editContainer) {
+            const hidden = document.getElementById('editResCourse');
+            const trigger = document.createElement('div');
+            trigger.className = 'custom-select-trigger';
+            trigger.setAttribute('tabindex', '0');
+            const dropdown = document.createElement('div');
+            dropdown.className = 'custom-select-dropdown';
+
+            const renderTrigger = (val) => {
+                trigger.innerHTML = '';
+                const c = this.courses.find(x => x.name === val);
+                if (c && c.color) {
+                    const sw = document.createElement('span');
+                    sw.className = 'select-color-swatch';
+                    sw.style.backgroundColor = c.color;
+                    trigger.appendChild(sw);
+                }
+                const lbl = document.createElement('span');
+                lbl.textContent = val || '選択してください';
+                lbl.style.color = val ? '' : '#999';
+                trigger.appendChild(lbl);
+                const arr = document.createElement('span');
+                arr.className = 'custom-select-arrow';
+                arr.textContent = '▾';
+                trigger.appendChild(arr);
+            };
+
+            renderTrigger(hidden.value);
+
+            const emptyOpt = document.createElement('div');
+            emptyOpt.className = 'custom-select-option';
+            emptyOpt.textContent = '選択してください';
+            emptyOpt.style.color = '#999';
+            emptyOpt.addEventListener('click', () => {
+                hidden.value = '';
+                renderTrigger('');
+                dropdown.classList.remove('open');
+                trigger.classList.remove('open');
+            });
+            dropdown.appendChild(emptyOpt);
+
+            this.courses.forEach(c => {
+                const opt = document.createElement('div');
+                opt.className = 'custom-select-option';
+                if (c.color) {
+                    const sw = document.createElement('span');
+                    sw.className = 'select-color-swatch';
+                    sw.style.backgroundColor = c.color;
+                    opt.appendChild(sw);
+                }
+                const nm = document.createElement('span');
+                nm.textContent = c.name;
+                opt.appendChild(nm);
+                opt.addEventListener('click', () => {
+                    hidden.value = c.name;
+                    renderTrigger(c.name);
+                    dropdown.classList.remove('open');
+                    trigger.classList.remove('open');
+                });
+                dropdown.appendChild(opt);
+            });
+
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = dropdown.classList.contains('open');
+                document.querySelectorAll('.custom-select-dropdown.open').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.custom-select-trigger.open').forEach(t => t.classList.remove('open'));
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                    trigger.classList.add('open');
+                }
+            });
+
+            editContainer.appendChild(trigger);
+            editContainer.appendChild(dropdown);
+        }
     }
 
     async saveReservationEdit(reservationId) {
@@ -1642,9 +1863,11 @@ class BoothReservationApp {
         }
         
         // コースを設定
-        const courseSelect = document.getElementById('adminCourseSelect');
-        if (courseSelect && params.course) {
-            courseSelect.value = params.course;
+        const courseHidden = document.getElementById('adminCourseSelect');
+        if (courseHidden && params.course) {
+            courseHidden.value = params.course;
+            // カスタムセレクトのトリガー表示を更新
+            setTimeout(() => this.updateCourseSelects(), 0);
         }
         
         // 目的を設定

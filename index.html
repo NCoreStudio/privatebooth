@@ -95,10 +95,11 @@
                     <input type="text" id="sideNameInput" required>
                 </div>
                 <div class="form-group">
-                    <label for="sideCourseSelect">コース *</label>
-                    <select id="sideCourseSelect" required>
-                        <option value="">選択してください</option>
-                    </select>
+                    <label>コース *</label>
+                    <div id="sideCourseSelectContainer" class="custom-select-container">
+                        <input type="hidden" id="sideCourseSelect">
+                        <!-- カスタムセレクトがJSで動的に生成されます -->
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>目的 *</label>
@@ -178,10 +179,11 @@
                         <input type="text" id="adminNameInput" placeholder="例：○○講習" required>
                     </div>
                     <div class="form-group">
-                        <label for="adminCourseSelect">コース</label>
-                        <select id="adminCourseSelect">
-                            <option value="">選択してください</option>
-                        </select>
+                        <label>コース</label>
+                        <div id="adminCourseSelectContainer" class="custom-select-container">
+                            <input type="hidden" id="adminCourseSelect">
+                            <!-- カスタムセレクトがJSで動的に生成されます -->
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>目的</label>
