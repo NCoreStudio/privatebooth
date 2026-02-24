@@ -2012,21 +2012,25 @@ class BoothReservationApp {
             
             console.log('Original reservation data:', { originalDate, originalFloor, originalSeats, originalStartMin, originalEndMin }); // デバッグ用ログ
             
-            // まずトランザクション外で元の予約を検索
+            // まずトランザクション外で元の予約を検索（inクエリの10件制限を回避するためJS側でフィルタ）
             const existingSnapshot = await reservationsCollection
                 .where('date', '==', originalDate)
                 .where('floor', '==', originalFloor)
                 .where('startMin', '==', originalStartMin)
                 .where('endMin', '==', originalEndMin)
-                .where('seatNo', 'in', originalSeats)
                 .get();
             
-            console.log(`Found ${existingSnapshot.docs.length} existing reservations to delete`); // デバッグ用ログ
+            // JS側でseatNoを絞り込む（Firestore 'in' は10件制限のため）
+            const originalSeatsSet = new Set(originalSeats);
+            const filteredDocs = existingSnapshot.docs.filter(doc => originalSeatsSet.has(doc.data().seatNo));
+            const existingDocsToDelete = { docs: filteredDocs };
+            
+            console.log(`Found ${existingDocsToDelete.docs.length} existing reservations to delete`); // デバッグ用ログ
             
             // Firestoreトランザクションを使用して原子性を保証
             await db.runTransaction(async (transaction) => {
                 // 1. 元の予約を削除
-                existingSnapshot.docs.forEach(doc => {
+                existingDocsToDelete.docs.forEach(doc => {
                     console.log(`Deleting original reservation: ${doc.id}, seat: ${doc.data().seatNo}`); // デバッグ用ログ
                     transaction.delete(doc.ref);
                 });
@@ -2491,19 +2495,22 @@ class BoothReservationApp {
     }
     
     async deleteLogRelatedReservations(date, floor, seats) {
+        // inクエリの10件制限を回避：日付・フロアで取得後にJS側でフィルタ
         const snapshot = await reservationsCollection
             .where('date', '==', date)
             .where('floor', '==', floor)
-            .where('seatNo', 'in', seats)
             .get();
         
+        const seatsSet = new Set(seats);
+        const targetDocs = snapshot.docs.filter(doc => seatsSet.has(doc.data().seatNo));
+        
         const batch = db.batch();
-        snapshot.docs.forEach(doc => {
+        targetDocs.forEach(doc => {
             batch.delete(doc.ref);
         });
         
         await batch.commit();
-        console.log(`Deleted ${snapshot.docs.length} related reservations`); // デバッグ用ログ
+        console.log(`Deleted ${targetDocs.length} related reservations`); // デバッグ用ログ
     }
     
     setupModalDrag() {
