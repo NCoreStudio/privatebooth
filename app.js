@@ -436,6 +436,10 @@ class BoothReservationApp {
 
             // seat-number以外（.seat-info や分割ブロック）をすべて削除して再構築
             const seatNumber = seatElement.querySelector('.seat-number');
+
+            // seat-number表示を必ず戻す
+            if (seatNumber) seatNumber.style.display = '';
+
             // seat-number以外の子要素を削除
             Array.from(seatElement.children).forEach(child => {
                 if (!child.classList.contains('seat-number')) child.remove();
@@ -470,9 +474,12 @@ class BoothReservationApp {
                     seatElement.style.backgroundColor = course.color;
                 }
             } else {
-                // 複数予約：縦分割ブロックで表示
+                // 複数予約：縦分割ブロックで表示（座席番号は最初のブロックに統合）
                 seatElement.classList.add('reserved', 'multi-reserved');
                 seatElement.style.backgroundColor = 'transparent';
+
+                // seat-numberを非表示（各ブロック内に組み込むため）
+                if (seatNumber) seatNumber.style.display = 'none';
 
                 // 時間順にソート
                 const sorted = [...seatReservations].sort((a, b) => a.startMin - b.startMin);
@@ -480,7 +487,7 @@ class BoothReservationApp {
                 const splitContainer = document.createElement('div');
                 splitContainer.className = 'seat-split-container';
 
-                sorted.forEach(reservation => {
+                sorted.forEach((reservation, idx) => {
                     const block = document.createElement('div');
                     block.className = 'seat-split-block';
 
@@ -492,7 +499,15 @@ class BoothReservationApp {
                         block.style.backgroundColor = '#ffcdd2';
                     }
 
-                    // 表示テキスト
+                    // 最初のブロックに席番号をバッジとして埋め込む
+                    if (idx === 0) {
+                        const numBadge = document.createElement('span');
+                        numBadge.className = 'seat-split-num';
+                        numBadge.textContent = seatNo;
+                        block.appendChild(numBadge);
+                    }
+
+                    // 名前
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'name-with-marker';
                     nameSpan.textContent = reservation.name;
@@ -1566,7 +1581,7 @@ class BoothReservationApp {
                         <select id="editResEnd">${endOptions}</select>
                     </div>
                     <div class="form-group">
-                        <label>① 席の移動</label>
+                        <label>席の移動</label>
                         <select id="editResSeat">${seatOptions}</select>
                     </div>
                 </div>
@@ -2658,9 +2673,12 @@ class BoothReservationApp {
                 const logData = logDoc.data();
                 const params = logData.params || {};
                 
-                // 関連する予約を削除
+                // 関連する予約を削除（startMin/endMinも渡して時間帯を限定）
                 if (params.date && params.floor && params.seats) {
-                    await this.deleteLogRelatedReservations(params.date, params.floor, params.seats);
+                    await this.deleteLogRelatedReservations(
+                        params.date, params.floor, params.seats,
+                        params.startMin, params.endMin
+                    );
                 }
             }
             
@@ -2678,23 +2696,35 @@ class BoothReservationApp {
         }
     }
     
-    async deleteLogRelatedReservations(date, floor, seats) {
-        // inクエリの10件制限を回避：日付・フロアで取得後にJS側でフィルタ
+    async deleteLogRelatedReservations(date, floor, seats, startMin, endMin) {
+        // 日付・フロアで取得後にJS側でseatNo・時間帯を絞り込む
+        // → 同じ席に別の時間帯の予約があっても巻き込まない
         const snapshot = await reservationsCollection
             .where('date', '==', date)
             .where('floor', '==', floor)
             .get();
         
         const seatsSet = new Set(seats);
-        const targetDocs = snapshot.docs.filter(doc => seatsSet.has(doc.data().seatNo));
+        const targetDocs = snapshot.docs.filter(doc => {
+            const d = doc.data();
+            // 席番号の一致チェック
+            if (!seatsSet.has(d.seatNo)) return false;
+            // startMin/endMin が渡されている場合は時間帯も一致するものだけ
+            if (startMin !== undefined && endMin !== undefined) {
+                return d.startMin === startMin && d.endMin === endMin;
+            }
+            return true;
+        });
         
         const batch = db.batch();
         targetDocs.forEach(doc => {
             batch.delete(doc.ref);
         });
         
-        await batch.commit();
-        console.log(`Deleted ${targetDocs.length} related reservations`); // デバッグ用ログ
+        if (targetDocs.length > 0) {
+            await batch.commit();
+        }
+        console.log(`Deleted ${targetDocs.length} related reservations`);
     }
     
     setupModalDrag() {
