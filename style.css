@@ -1622,3 +1622,82 @@ body {
     cursor: not-allowed;
     opacity: 0.5;
 }
+
+/* ========== 複数予約の縦分割表示 ========== */
+.seat.multi-reserved {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+.seat.multi-reserved .seat-number {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 4px 0 2px;
+    text-align: center;
+    background: rgba(255,255,255,0.55);
+    width: 100%;
+    color: #333;
+    line-height: 1.1;
+    flex-shrink: 0;
+}
+
+.seat-split-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+.seat-split-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 4px;
+    font-size: 11px;
+    line-height: 1.25;
+    min-height: 18px;
+    border-top: 2px solid rgba(255,255,255,0.7);
+    text-align: center;
+    overflow: hidden;
+}
+
+.seat-split-block:first-child {
+    border-top: none;
+}
+
+.seat-split-block .name-with-marker {
+    background: rgba(255,255,255,0.55);
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: bold;
+    font-size: 11px;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.seat-split-course {
+    font-size: 9px;
+    color: #333;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.seat-split-purpose {
+    font-size: 9px;
+    color: #555;
+    font-style: italic;
+    display: block;
+}

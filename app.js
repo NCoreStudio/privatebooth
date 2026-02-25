@@ -417,73 +417,105 @@ class BoothReservationApp {
     }
 
     updateSeatColors() {
-        // すべての座席要素を取得して、現在のフロアの要素のみ処理する
         const allSeatElements = document.querySelectorAll('.seat');
-        const currentFloorSeats = Array.from(allSeatElements).filter(element => 
+        const currentFloorSeats = Array.from(allSeatElements).filter(element =>
             element.className.includes(`seat-${this.currentFloor.toLowerCase()}-`)
         );
-        
-        console.log(`Updating seat colors for floor ${this.currentFloor}. Found ${currentFloorSeats.length} seat elements. Total reservations:`, this.reservations);
-        
+
+        console.log(`Updating seat colors for floor ${this.currentFloor}. Found ${currentFloorSeats.length} seat elements.`);
+
         currentFloorSeats.forEach(seatElement => {
             const seatNo = parseInt(seatElement.dataset.seat);
-            // 現在のフロアの座席のみをフィルタリングして、6Fと7Fで同じ席番号が混在しないようにする
-            const seatReservations = this.reservations.filter(r => 
+            const seatReservations = this.reservations.filter(r =>
                 r.seatNo === seatNo && r.floor === this.currentFloor
             );
-            
-            console.log(`Seat ${seatNo} on floor ${this.currentFloor}: ${seatReservations.length} reservations`);
-            
-            // すべての予約関連クラスを削除
-            seatElement.classList.remove('reserved', 'selected');
+
+            // 予約関連クラス・スタイルをリセット
+            seatElement.classList.remove('reserved', 'selected', 'multi-reserved');
             seatElement.style.backgroundColor = '';
-            
-            if (seatReservations.length > 0) {
-                const seatInfo = seatElement.querySelector('.seat-info');
-                if (seatInfo) {
-                    if (seatReservations.length === 1) {
-                        const reservation = seatReservations[0];
-                        
-                        // 名前の部分にマーカーを適用
-                        const nameWithMarker = `<span class="name-with-marker">${reservation.name}</span>`;
-                        let displayText = nameWithMarker;
-                        
-                        // コース名を追加
-                        if (reservation.course) {
-                            displayText += `\n(${reservation.course})`;
-                        }
-                        
-                        // 目的を追加
-                        if (reservation.purposeType && reservation.purposeType !== '自習') {
-                            displayText += `\n${reservation.purposeType}`;
-                        }
-                        
-                        seatInfo.innerHTML = displayText;
-                    } else {
-                        seatInfo.textContent = seatReservations[0].name + 'ほか';
-                    }
-                }
-                
-                // 最初の予約のコースに基づいて色を設定
+
+            // seat-number以外（.seat-info や分割ブロック）をすべて削除して再構築
+            const seatNumber = seatElement.querySelector('.seat-number');
+            // seat-number以外の子要素を削除
+            Array.from(seatElement.children).forEach(child => {
+                if (!child.classList.contains('seat-number')) child.remove();
+            });
+
+            if (seatReservations.length === 0) {
+                // 空席：seat-infoを空で追加
+                const seatInfo = document.createElement('div');
+                seatInfo.className = 'seat-info';
+                seatElement.appendChild(seatInfo);
+                return;
+            }
+
+            if (seatReservations.length === 1) {
+                // 1予約：従来どおり
                 const reservation = seatReservations[0];
-                if (reservation.course) {
-                    const course = this.courses.find(c => c.name === reservation.course);
-                    if (course && course.color) {
-                        seatElement.style.backgroundColor = course.color;
-                        seatElement.classList.add('reserved');
-                    } else {
-                        // コースが見つからない場合や色がない場合はデフォルトの赤色
-                        seatElement.classList.add('reserved');
-                    }
-                } else {
-                    // コースが設定されていない場合はデフォルトの赤色
-                    seatElement.classList.add('reserved');
+                const seatInfo = document.createElement('div');
+                seatInfo.className = 'seat-info';
+
+                const nameWithMarker = `<span class="name-with-marker">${reservation.name}</span>`;
+                let displayText = nameWithMarker;
+                if (reservation.course) displayText += `\n(${reservation.course})`;
+                if (reservation.purposeType && reservation.purposeType !== '自習') {
+                    displayText += `\n${reservation.purposeType}`;
+                }
+                seatInfo.innerHTML = displayText;
+                seatElement.appendChild(seatInfo);
+
+                seatElement.classList.add('reserved');
+                const course = this.courses.find(c => c.name === reservation.course);
+                if (course && course.color) {
+                    seatElement.style.backgroundColor = course.color;
                 }
             } else {
-                const seatInfo = seatElement.querySelector('.seat-info');
-                if (seatInfo) {
-                    seatInfo.textContent = '';
-                }
+                // 複数予約：縦分割ブロックで表示
+                seatElement.classList.add('reserved', 'multi-reserved');
+                seatElement.style.backgroundColor = 'transparent';
+
+                // 時間順にソート
+                const sorted = [...seatReservations].sort((a, b) => a.startMin - b.startMin);
+
+                const splitContainer = document.createElement('div');
+                splitContainer.className = 'seat-split-container';
+
+                sorted.forEach(reservation => {
+                    const block = document.createElement('div');
+                    block.className = 'seat-split-block';
+
+                    // 背景色設定
+                    const course = this.courses.find(c => c.name === reservation.course);
+                    if (course && course.color) {
+                        block.style.backgroundColor = course.color;
+                    } else {
+                        block.style.backgroundColor = '#ffcdd2';
+                    }
+
+                    // 表示テキスト
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'name-with-marker';
+                    nameSpan.textContent = reservation.name;
+                    block.appendChild(nameSpan);
+
+                    if (reservation.course) {
+                        const courseSpan = document.createElement('span');
+                        courseSpan.className = 'seat-split-course';
+                        courseSpan.textContent = `(${reservation.course})`;
+                        block.appendChild(courseSpan);
+                    }
+
+                    if (reservation.purposeType && reservation.purposeType !== '自習') {
+                        const purposeSpan = document.createElement('span');
+                        purposeSpan.className = 'seat-split-purpose';
+                        purposeSpan.textContent = reservation.purposeType;
+                        block.appendChild(purposeSpan);
+                    }
+
+                    splitContainer.appendChild(block);
+                });
+
+                seatElement.appendChild(splitContainer);
             }
         });
     }
