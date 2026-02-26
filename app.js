@@ -2343,7 +2343,7 @@ class BoothReservationApp {
             reservationInfo.appendChild(purposeDiv);
         }
 
-        if (reservation.purposeType === '補講' && reservation.note) {
+        if ((reservation.purposeType === '補講' || reservation.purposeType === 'その他') && reservation.note) {
             const noteDiv = document.createElement('div');
             noteDiv.className = 'reservation-note';
             noteDiv.textContent = `📋 ${reservation.note}`;
