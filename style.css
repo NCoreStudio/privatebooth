@@ -90,38 +90,6 @@ body {
     color: #495057;
 }
 
-.date-nav-btn {
-    padding: 8px 12px;
-    border: 1px solid #007bff;
-    background: white;
-    color: #007bff;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    transition: all 0.2s ease;
-}
-
-.date-nav-btn:hover {
-    background: #007bff;
-    color: white;
-}
-
-.date-nav-btn:active {
-    transform: scale(0.95);
-}
-
-.date-weekday {
-    margin-left: 8px;
-    padding: 4px 8px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #495057;
-}
-
 .floor-tabs {
     display: flex;
     gap: 5px;
@@ -214,20 +182,26 @@ body {
 .seat-layout {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    gap: 12px; /* 間隔を広げる */
+    grid-auto-rows: minmax(7vw, 90px); /* 列幅(≈7vw)に追従しつつ最低90px確保 */
+    gap: 12px;
     margin: 20px 0;
-    min-height: 400px;
 }
 
 .seat {
     background: white;
     border: 2px solid #ddd;
     border-radius: 8px;
-    padding: 12px 8px;
+    padding: 8px 6px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s;
-    min-height: 70px;
+    transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    /* サイズはgridに完全委任。内容・予約状況でサイズを変えない */
+    width: 100%;
+    height: 100%;
+    min-height: 0;       /* grid行高を超えた伸びを防ぐ */
+    max-height: 100%;    /* grid行高を超えた伸びを防ぐ */
+    box-sizing: border-box;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -252,19 +226,68 @@ body {
 }
 
 .seat-number {
-    font-size: 20px;
+    font-size: 20px;  /* JSで縮小される初期値 */
     font-weight: bold;
-    margin-bottom: 8px;
+    margin-bottom: 3px;  /* 3段に詰める */
     color: #333;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .seat-info {
-    font-size: 13px;
-    opacity: 1;
-    white-space: pre-line;
+    /* 空席表示用（予約なし時の空div）—実質的に何も表示しない */
+    display: none;
+}
+
+/* ========== 1件予約: 3段テキスト構成 ========== */
+
+/* 名前行 */
+.seat-name-row {
+    display: block;
+    width: 100%;
+    text-align: center;
     line-height: 1.3;
-    font-weight: 500;
+    overflow: hidden;
+}
+
+.seat-name-row .name-with-marker {
+    display: inline-block;
+    white-space: nowrap; /* JS(_fitTextToWidth)でnowrap設定済みだが念のため */
+    font-size: 14px;     /* JSで縮小される初期値 */
+    font-weight: bold;
     color: #222;
+    background: rgba(255,255,255,0.55);
+    padding: 0 3px;
+    border-radius: 2px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* コース名行 */
+.seat-course-row {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 11px;     /* JSで縮小される初期値 */
+    color: #333;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-top: 1px;
+}
+
+/* 目的行（補講・その他） */
+.seat-purpose-row {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    color: #555;
+    font-style: italic;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-top: 1px;
 }
 
 .name-with-marker {
@@ -1469,10 +1492,47 @@ body {
         flex-wrap: wrap;
     }
 
+    /* 日付セレクタ：←→ボタンを同一行・同一ベースラインに揃える */
     .date-selector {
-        flex-wrap: wrap;
+        display: flex;
+        flex-wrap: nowrap;
         justify-content: center;
-        gap: 6px;
+        align-items: center;  /* 全要素を垂直中央揃え */
+        gap: 5px;
+    }
+
+    .date-selector label {
+        display: none;        /* 「日付：」ラベルはタブレット以下では省略 */
+    }
+
+    .date-selector input[type="date"] {
+        font-size: 13px;
+        padding: 6px 6px;
+        flex: 1;
+        min-width: 0;
+        height: 36px;         /* ←→ボタンと高さを揃える */
+        box-sizing: border-box;
+    }
+
+    .date-nav-btn {
+        height: 36px;         /* input と高さを統一 */
+        padding: 0 12px;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
+    }
+
+    .date-weekday {
+        font-size: 11px;
+        padding: 3px 5px;
+        white-space: nowrap;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
     }
 
     .legend {
@@ -1480,20 +1540,21 @@ body {
         gap: 12px;
     }
 
-    /* 座席グリッド */
+    /* 座席グリッド：タブレット6列、行高固定 */
     .seat-layout {
         grid-template-columns: repeat(6, 1fr);
+        grid-auto-rows: minmax(13vw, 72px); /* 6列時: 列幅≈15vwに追従 */
         gap: 6px;
     }
 
+    /* .seat のパディングのみ調整（サイズはgridに委任） */
     .seat {
-        padding: 6px 4px;
-        min-height: 56px;
+        padding: 5px 3px;
     }
 
     .seat-number {
-        font-size: 16px;
-        margin-bottom: 4px;
+        font-size: 15px;
+        margin-bottom: 3px;
     }
 
     .seat-info {
@@ -1546,29 +1607,49 @@ body {
         font-size: 10px;
     }
 
-    .date-selector input[type="date"] {
-        font-size: 13px;
-        padding: 6px 8px;
-    }
-
+    /* ←→ボタン：inputと高さ・ベースラインを揃える */
     .date-nav-btn {
-        padding: 6px 10px;
-        font-size: 14px;
+        height: 34px;
+        padding: 0 10px;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
     }
 
-    /* 座席グリッド：スマホは4列 */
+    .date-selector input[type="date"] {
+        height: 34px;
+        font-size: 14px;  /* iOS zoom防止は16px未満でもmax-hightで制御 */
+        padding: 0 6px;
+        box-sizing: border-box;
+    }
+
+    .date-weekday {
+        height: 34px;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+        padding: 0 5px;
+    }
+
+    /* 座席グリッド：スマホは4列、行高固定 */
     .seat-layout {
         grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: minmax(19vw, 68px); /* 4列時: 列幅≈22vwに追従 */
         gap: 5px;
     }
 
+    /* .seat のパディングのみ（サイズはgridに委任） */
     .seat {
-        padding: 5px 3px;
-        min-height: 50px;
+        padding: 4px 2px;
     }
 
     .seat-number {
-        font-size: 14px;
+        font-size: 13px;
+        margin-bottom: 2px;
     }
 
     .seat-info {
@@ -1763,11 +1844,7 @@ body {
 .seat.multi-reserved {
     padding: 0 !important;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: stretch;
-    min-height: 70px;
+    /* サイズはgridに委任。multi-reservedでも変わらない */
 }
 
 .seat.multi-reserved .seat-number {
@@ -1775,11 +1852,16 @@ body {
 }
 
 .seat-split-container {
+    /* 親(.seat)の枠いっぱいに広げる。絶対配置で確実に親サイズに収める */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     width: 100%;
-    flex: 1;
-    min-height: 70px;
+    overflow: hidden;
 }
 
 .seat-split-block {
@@ -1788,14 +1870,14 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 4px 5px;
+    padding: 2px 4px;
     font-size: 11px;
-    line-height: 1.3;
-    min-height: 32px;
+    line-height: 1.2;
     border-top: 2px solid rgba(255,255,255,0.75);
     text-align: center;
     overflow: hidden;
     position: relative;
+    min-height: 0; /* flex子要素の縮小を許可（はみ出し防止） */
 }
 
 .seat-split-block:first-child {
@@ -1820,22 +1902,20 @@ body {
     padding: 0 2px;
     border-radius: 2px;
     font-weight: bold;
-    font-size: 11px;
+    font-size: 11px; /* JSで自動縮小される */
     display: inline-block;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* white-space はJS(_fitTextToWidth)がnowrapに設定する */
 }
 
 .seat-split-course {
-    font-size: 9px;
+    font-size: 9px; /* JSで自動縮小される */
     color: #333;
     display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     max-width: 100%;
+    overflow: hidden;
+    /* white-space はJS(_fitTextToWidth)がnowrapに設定する */
 }
 
 .seat-split-purpose {

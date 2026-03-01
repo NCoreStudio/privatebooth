@@ -461,17 +461,32 @@ class BoothReservationApp {
 
             if (seatReservations.length === 1) {
                 const reservation = seatReservations[0];
-                const seatInfo = document.createElement('div');
-                seatInfo.className = 'seat-info';
 
-                const nameWithMarker = `<span class="name-with-marker">${reservation.name}</span>`;
-                let displayText = nameWithMarker;
-                if (reservation.course) displayText += `\n(${reservation.course})`;
-                if (reservation.purposeType && reservation.purposeType !== '自習') {
-                    displayText += `\n${reservation.purposeType}`;
+                // --- 3段構成: 座席番号(seatNumber済み) / 名前 / コース名 ---
+                // 名前行
+                const nameRow = document.createElement('div');
+                nameRow.className = 'seat-name-row';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'name-with-marker';
+                nameSpan.textContent = reservation.name;
+                nameRow.appendChild(nameSpan);
+                seatElement.appendChild(nameRow);
+
+                // コース名行（ある場合のみ）
+                if (reservation.course) {
+                    const courseRow = document.createElement('div');
+                    courseRow.className = 'seat-course-row';
+                    courseRow.textContent = reservation.course;
+                    seatElement.appendChild(courseRow);
                 }
-                seatInfo.innerHTML = displayText;
-                seatElement.appendChild(seatInfo);
+
+                // 目的行（自習以外）
+                if (reservation.purposeType && reservation.purposeType !== '自習') {
+                    const purposeRow = document.createElement('div');
+                    purposeRow.className = 'seat-purpose-row';
+                    purposeRow.textContent = reservation.purposeType;
+                    seatElement.appendChild(purposeRow);
+                }
 
                 seatElement.classList.add('reserved');
                 const course = this.courses.find(c => c.name === reservation.course);
@@ -532,6 +547,69 @@ class BoothReservationApp {
                 seatElement.appendChild(splitContainer);
             }
         });
+
+        // DOM描画後にフォントを自動縮小して枠内に収める
+        requestAnimationFrame(() => { this.fitAllSeatText(); });
+    }
+
+    /**
+     * 全座席のテキストを枠内に収まるよう自動縮小する。
+     * 名前・コース名それぞれを1行(nowrap)で収める。
+     */
+    fitAllSeatText() {
+        // 座席の実際のサイズからフォント上限を動的に算出する
+        // 座席幅の約25%を名前フォント上限の基準にする（比例スケーリング）
+        const calcMaxFont = (seatW, ratio) => Math.min(Math.max(seatW * ratio, 8), 999);
+
+        // ---- 1件予約: 座席番号・名前・コース名を各行1行で縮小 ----
+        document.querySelectorAll('.seat:not(.multi-reserved)').forEach(seat => {
+            const w = seat.clientWidth - 10; // 左右パディング分
+
+            // 座席番号: 幅の22%を上限（最小12px）
+            const numEl = seat.querySelector('.seat-number');
+            if (numEl) this._fitTextToWidth(numEl, w, calcMaxFont(w, 0.22), 12);
+
+            // 名前（最重要: 幅の18%を上限、最小8px）
+            const nameEl = seat.querySelector('.seat-name-row .name-with-marker');
+            if (nameEl) this._fitTextToWidth(nameEl, w, calcMaxFont(w, 0.18), 8);
+
+            // コース名（名前より小さめ: 幅の13%を上限）
+            const courseEl = seat.querySelector('.seat-course-row');
+            if (courseEl) this._fitTextToWidth(courseEl, w, calcMaxFont(w, 0.13), 7);
+
+            // 目的（補講・その他）
+            const purposeEl = seat.querySelector('.seat-purpose-row');
+            if (purposeEl) this._fitTextToWidth(purposeEl, w, calcMaxFont(w, 0.12), 7);
+        });
+
+        // ---- 複数予約: 各 .seat-split-block 内の要素を個別縮小 ----
+        document.querySelectorAll('.seat-split-block').forEach(block => {
+            const blockW = block.clientWidth - 6;
+            const calcB = (r) => calcMaxFont(blockW, r);
+
+            const nameEl    = block.querySelector('.name-with-marker');
+            const courseEl  = block.querySelector('.seat-split-course');
+            const purposeEl = block.querySelector('.seat-split-purpose');
+            const numEl     = block.querySelector('.seat-split-num');
+
+            if (numEl)     this._fitTextToWidth(numEl,     blockW - 4, calcB(0.20), 7);
+            if (nameEl)    this._fitTextToWidth(nameEl,    blockW,     calcB(0.17), 6);
+            if (courseEl)  this._fitTextToWidth(courseEl,  blockW,     calcB(0.13), 6);
+            if (purposeEl) this._fitTextToWidth(purposeEl, blockW,     calcB(0.12), 6);
+        });
+    }
+
+    /**
+     * el のテキストを1行(white-space:nowrap)のまま maxWidth 内に収まるまでフォント縮小。
+     */
+    _fitTextToWidth(el, maxWidth, maxSize, minSize) {
+        el.style.whiteSpace = 'nowrap';
+        el.style.fontSize = maxSize + 'px';
+        let size = maxSize;
+        while (size > minSize && el.scrollWidth > maxWidth) {
+            size -= 0.5;
+            el.style.fontSize = size + 'px';
+        }
     }
 
     resetSideForm() {
