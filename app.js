@@ -704,6 +704,7 @@ class BoothReservationApp {
     showAdminPanel() {
         document.getElementById('adminPanel').classList.add('active');
         document.getElementById('adminDateSelect').value = this.currentDate;
+        document.body.style.overflow = 'hidden';
         
         this.resetAdminForms();
         
@@ -714,6 +715,7 @@ class BoothReservationApp {
     hideAdminPanel() {
         const modal = document.getElementById('adminPanel');
         const modalContent = modal.querySelector('.modal-content');
+        document.body.style.overflow = '';
         if (modal) {
             modal.classList.remove('active');
             
@@ -1373,18 +1375,23 @@ class BoothReservationApp {
             const startTime = this.formatTime(reservation.startMin);
             const endTime = this.formatTime(reservation.endMin);
             
+            const purposeBadge = (reservation.purposeType && reservation.purposeType !== '自習')
+                ? `<span style="font-size:11px;color:#e67e22;font-weight:bold;">【${reservation.purposeType}】</span> `
+                : '';
+            const noteHtml = (reservation.purposeType === '補講' || reservation.purposeType === 'その他') && reservation.note
+                ? `<br><small class="note-text">📋 ${reservation.note}</small>`
+                : '';
+            
             item.innerHTML = `
-                <div class="reservation-info">
-                    <strong>${reservation.name}</strong>
-                    ${reservation.course ? `(${reservation.course})` : ''}
-                    <br>
-                    <small>${startTime} - ${endTime}</small>
-                    ${reservation.note ? `<br><small class="note-text">準備物: ${reservation.note}</small>` : ''}
+                <div class="reservation-item-info">
+                    <div class="reservation-time">${startTime} - ${endTime}</div>
+                    <div class="reservation-name">${purposeBadge}${reservation.name}${reservation.course ? ` <span style="font-weight:normal;font-size:12px;color:#666;">(${reservation.course})</span>` : ''}</div>
+                    ${noteHtml}
                 </div>
                 <div class="reservation-actions">
-                    <button class="edit-reservation-btn" data-id="${reservation.id}">編集</button>
-                    <button class="duplicate-reservation-btn" data-id="${reservation.id}">複製</button>
-                    <button class="delete-btn" data-id="${reservation.id}">削除</button>
+                    <button class="edit-reservation-btn" data-id="${reservation.id}">✏️ 編集</button>
+                    <button class="duplicate-reservation-btn" data-id="${reservation.id}">📋 複製</button>
+                    <button class="delete-btn" data-id="${reservation.id}">🗑 削除</button>
                 </div>
             `;
             
@@ -1720,11 +1727,16 @@ class BoothReservationApp {
         this.renderReservationsList();
         
         panel.classList.add('active');
+        // スマホでパネルを開いたとき背景スクロールを止める
+        if (window.innerWidth <= 768) {
+            document.body.style.overflow = 'hidden';
+        }
     }
 
     hideSidePanel() {
         const panel = document.getElementById('sidePanel');
         if (panel) panel.classList.remove('active');
+        document.body.style.overflow = '';
         document.querySelectorAll('.seat').forEach(s => s.classList.remove('selected'));
         this.selectedSeat = null;
     }
@@ -2243,6 +2255,7 @@ class BoothReservationApp {
         previewModal.style.maxWidth = '100vw';
         previewModal.style.width = 'fit-content';
         previewModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
         
         document.getElementById('previewDate').value = this.previewCurrentDate;
         
@@ -2260,6 +2273,7 @@ class BoothReservationApp {
         const modal = document.getElementById('previewModal');
         const modalContent = modal.querySelector('.modal-content');
         modal.classList.remove('active');
+        document.body.style.overflow = '';
         
         if (modalContent) {
             modalContent.style.position = '';
