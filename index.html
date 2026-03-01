@@ -10,31 +10,43 @@
     <div class="container">
         <!-- ヘッダー -->
         <header class="header">
-            <div class="site-title">個別ブース予約管理ツール</div>
-            <div class="header-controls">
-                <div class="date-selector">
-                    <label for="dateSelect">日付：</label>
-                    <input type="date" id="dateSelect">
-                    <span class="date-weekday" id="dateWeekday"></span>
-                    <button class="date-nav-btn" id="prevDateBtn">←</button>
-                    <button class="date-nav-btn" id="nextDateBtn">→</button>
+            <div class="header-inner">
+                <!-- 左：日付選択＋凡例 -->
+                <div class="header-left">
+                    <div class="date-selector">
+                        <label for="dateSelect">日付：</label>
+                        <input type="date" id="dateSelect">
+                        <span class="date-weekday" id="dateWeekday"></span>
+                        <button class="date-nav-btn" id="prevDateBtn">←</button>
+                        <button class="date-nav-btn" id="nextDateBtn">→</button>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color empty"></div>
+                            <span>空き</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color reserved"></div>
+                            <span>予約あり</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="floor-tabs">
-                    <button class="floor-tab active" data-floor="6F">6F</button>
-                    <button class="floor-tab" data-floor="7F">7F</button>
+                <!-- 中央：タイトル＋F5ヒント＋ボタン群 -->
+                <div class="header-center">
+                    <div class="site-title">個別ブース予約管理ツール</div>
+                    <div class="f5-hint">F5を押すと本日の予約画面に戻ります</div>
+                    <div class="floor-and-tools">
+                        <div class="floor-tabs">
+                            <button class="floor-tab active" data-floor="6F">6F</button>
+                            <button class="floor-tab" data-floor="7F">7F</button>
+                        </div>
+                        <button class="admin-btn" id="adminBtn">管理者</button>
+                        <button class="preview-btn" id="previewBtn">プレビュー</button>
+                        <button class="delete-all-btn" id="deleteAllTodayBtn">当日の予約を全て削除</button>
+                    </div>
                 </div>
-                <button class="admin-btn" id="adminBtn">管理者</button>
-                <button class="preview-btn" id="previewBtn">プレビュー</button>
-            </div>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color empty"></div>
-                    <span>空き</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color reserved"></div>
-                    <span>予約あり</span>
-                </div>
+                <!-- 右：空きスペース（バランス用） -->
+                <div class="header-right"></div>
             </div>
         </header>
 
@@ -62,7 +74,6 @@
                                 </tr>
                             </thead>
                             <tbody id="previewTableBody">
-                                <!-- 座席と予約情報がここに動的に挿入されます -->
                             </tbody>
                         </table>
                     </div>
@@ -73,7 +84,6 @@
         <!-- 座席レイアウト -->
         <main class="main">
             <div class="seat-layout" id="seatLayout">
-                <!-- 座席がJavaScriptで動的に生成されます -->
             </div>
         </main>
 
@@ -95,10 +105,11 @@
                     <input type="text" id="sideNameInput" required>
                 </div>
                 <div class="form-group">
-                    <label for="sideCourseSelect">コース *</label>
-                    <select id="sideCourseSelect" required>
-                        <option value="">選択してください</option>
-                    </select>
+                    <label>コース *</label>
+                    <div id="sideCourseSelectContainer" class="custom-select-container">
+                        <input type="hidden" id="sideCourseSelect">
+                        <!-- カスタムセレクトがJSで動的に生成されます -->
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>目的 *</label>
@@ -130,8 +141,6 @@
         </div>
     </div>
 
-
-
     <!-- 管理者パネル -->
     <div class="modal" id="adminPanel">
         <div class="modal-content admin-panel-content">
@@ -145,7 +154,7 @@
                     <button class="admin-tab" data-tab="courses">コース管理</button>
                     <button class="admin-tab" data-tab="logs">ログ</button>
                 </div>
-                
+
                 <!-- 一括確保タブ -->
                 <div class="admin-tab-content active" id="bulkTab">
                     <div class="form-group">
@@ -162,7 +171,6 @@
                     <div class="form-group">
                         <label>席選択</label>
                         <div class="seat-pick-container" id="seatPickContainer">
-                            <!-- 席番号ボタンが動的に生成されます -->
                         </div>
                     </div>
                     <div class="form-group">
@@ -178,10 +186,11 @@
                         <input type="text" id="adminNameInput" placeholder="例：○○講習" required>
                     </div>
                     <div class="form-group">
-                        <label for="adminCourseSelect">コース</label>
-                        <select id="adminCourseSelect">
-                            <option value="">選択してください</option>
-                        </select>
+                        <label>コース</label>
+                        <div id="adminCourseSelectContainer" class="custom-select-container">
+                            <input type="hidden" id="adminCourseSelect">
+                            <!-- カスタムセレクトがJSで動的に生成されます -->
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>目的</label>
@@ -194,13 +203,13 @@
                     </div>
                     <button type="button" class="submit-btn" id="bulkReserveBtn">予約実行</button>
                     <div class="bulk-results" id="bulkResults"></div>
-                    
+
                     <!-- 繰り返し設定 -->
                     <div class="recurring-checkbox-container">
                         <input type="checkbox" id="useRecurring">
                         <label for="useRecurring">繰り返し設定を使う</label>
                     </div>
-                    
+
                     <div id="recurringOptions" class="recurring-settings" style="display:none;">
                         <div class="form-group">
                             <label for="recurringStartDate">開始日</label>
@@ -224,7 +233,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- コース管理タブ -->
                 <div class="admin-tab-content" id="coursesTab">
                     <div class="courses-header">
@@ -232,10 +241,9 @@
                         <button class="add-btn" id="addCourseBtn">追加</button>
                     </div>
                     <div class="courses-list" id="coursesList">
-                        <!-- コースリストが動的に生成されます -->
                     </div>
                 </div>
-                
+
                 <!-- ログタブ -->
                 <div class="admin-tab-content" id="logsTab">
                     <div class="logs-header">
@@ -243,7 +251,6 @@
                         <button class="refresh-btn" id="refreshLogsBtn">更新</button>
                     </div>
                     <div class="logs-list" id="logsList">
-                        <!-- ログリストが動的に生成されます -->
                     </div>
                 </div>
             </div>
@@ -256,7 +263,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    
+
     <script src="firebase.js"></script>
     <script src="app.js"></script>
 </body>
