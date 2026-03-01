@@ -1637,8 +1637,8 @@ body {
 
     /* 座席グリッド：スマホは4列、行高固定 */
     .seat-layout {
-        grid-template-columns: repeat(4, 1fr);
-        grid-auto-rows: minmax(19vw, 68px); /* 4列時: 列幅≈22vwに追従 */
+        grid-template-columns: repeat(6, 1fr);
+        grid-auto-rows: minmax(13vw, 60px); /* 6列均等: 列幅≈16vwに追従 */
         gap: 5px;
     }
 
