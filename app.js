@@ -2583,33 +2583,27 @@ ${tableHTML}
 <script>
 window.onload = function() {
   // A4 portrait: 210mm x 297mm → 96dpi 換算 ≒ 794px x 1123px
-  // margin 8mm x 2 = 16mm ≒ 60px 分を差し引く
-  var PAGE_W = 794 - 60;
-  var PAGE_H = 1123 - 60;
+  // margin 8mm (各辺 ≒ 30px) を差し引いた使用可能領域
+  var USABLE_W = 734; // 794 - 30*2
+  var USABLE_H = 1063; // 1123 - 30*2
 
-  var header = document.querySelector('.print-header');
-  var headerH = header ? header.offsetHeight + 8 : 0;
-  var usableH = PAGE_H - headerH;
+  // ページ全体の実寸を計測（ヘッダー＋テーブル合計）
+  var totalW = document.body.scrollWidth;
+  var totalH = document.body.scrollHeight;
 
-  var wrapper = document.getElementById('scaleWrapper');
-  var tbl = wrapper.querySelector('table');
-  var natW = tbl.scrollWidth;
-  var natH = tbl.scrollHeight;
-
-  var scaleW = PAGE_W / natW;
-  var scaleH = usableH / natH;
-  var scale  = Math.min(scaleW, scaleH, 1);
+  var scale = Math.min(USABLE_W / totalW, USABLE_H / totalH, 1);
+  // 3%の安全マージン（ブラウザのレンダリング誤差・余白のズレを吸収）
+  scale *= 0.97;
 
   if (scale < 1) {
-    // zoom はレイアウトサイズごと縮小するため印刷ページ数を正しく制御できる
-    // (transform:scale は見た目だけ縮小しレイアウトは元サイズのまま → 2ページになる)
-    wrapper.style.zoom = scale.toFixed(4);
+    // html要素全体にzoomを適用 → ヘッダー含むページ全体がレイアウトごと縮小される
+    document.documentElement.style.zoom = scale.toFixed(5);
   }
 
   setTimeout(function() {
     window.print();
     window.close();
-  }, 500);
+  }, 700);
 };
 </script>
 </body>
