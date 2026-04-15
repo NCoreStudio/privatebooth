@@ -2510,6 +2510,9 @@ class BoothReservationApp {
     color: #333;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    /* 幅を固定することでポップアップサイズに依存せず一定の計測値を保証する */
+    width: 850px;
+    overflow: hidden;
   }
   .print-header {
     text-align: center;
