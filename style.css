@@ -814,6 +814,23 @@ body {
     font-weight: 500;
 }
 
+.print-preview-btn {
+    padding: 6px 16px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    transition: background 0.2s;
+    margin-right: 8px;
+}
+
+.print-preview-btn:hover {
+    background: #218838;
+}
+
 .close-button {
     background: none;
     border: none;

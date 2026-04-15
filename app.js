@@ -102,6 +102,11 @@ class BoothReservationApp {
             this.hidePreviewModal();
         });
 
+        // プレビュー印刷ボタン
+        document.getElementById('printPreviewBtn').addEventListener('click', () => {
+            this.printPreview();
+        });
+
         // プレビュー日付変更
         document.getElementById('previewDate').addEventListener('change', (e) => {
             this.previewCurrentDate = e.target.value;
@@ -2470,6 +2475,146 @@ class BoothReservationApp {
             
             tableBody.appendChild(row);
         }
+    }
+
+    printPreview() {
+        const table = document.getElementById('previewTable');
+        if (!table) return;
+
+        const tableHTML = table.outerHTML;
+        const date = this.previewCurrentDate;
+        const floor = this.previewCurrentFloor;
+
+        // 日付を「YYYY年MM月DD日（曜）」形式に変換
+        const d = new Date(date + 'T00:00:00');
+        const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+        const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+
+        const printWindow = window.open('', '_blank', 'width=850,height=1200');
+        if (!printWindow) {
+            this.showToast('ポップアップがブロックされました。許可してください。', 'error');
+            return;
+        }
+
+        printWindow.document.write(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>予約状況 ${dateLabel} ${floor}</title>
+<style>
+  @page { size: A4 portrait; margin: 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: white;
+    color: #333;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-header {
+    text-align: center;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #333;
+  }
+  .print-header h2 { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
+  .print-header p  { font-size: 11px; }
+  #scaleWrapper {
+    transform-origin: top left;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 8px;
+  }
+  th, td {
+    border: 1px solid #999;
+    padding: 1px 2px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  th {
+    background: #e8e8e8 !important;
+    font-weight: bold;
+    font-size: 7px;
+  }
+  th:first-child, td:first-child {
+    background: #f0f0f0 !important;
+    font-weight: bold;
+    min-width: 28px;
+    font-size: 8px;
+  }
+  .reserved-cell { font-weight: bold; }
+  .reservation-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1px;
+    font-size: 7px;
+    line-height: 1.2;
+  }
+  .reservation-name { font-weight: bold; font-size: 8px; }
+  .name-with-marker {
+    background: rgba(255,255,255,0.55);
+    padding: 0 2px;
+    border-radius: 1px;
+    display: inline-block;
+  }
+  .reservation-course  { font-size: 6.5px; margin-top: 1px; }
+  .reservation-purpose { font-size: 6.5px; font-style: italic; margin-top: 1px; }
+  .reservation-time    { font-size: 6px; margin-top: 1px; color: #444; }
+  .reservation-note    { font-size: 6px; margin-top: 1px; color: #555; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="print-header">
+  <h2>個別ブース予約状況</h2>
+  <p>${dateLabel}　${floor}</p>
+</div>
+<div id="scaleWrapper">
+${tableHTML}
+</div>
+<script>
+window.onload = function() {
+  // A4 portrait: 210mm x 297mm → 96dpi 換算 ≒ 794px x 1123px
+  // margin 8mm x 2 = 16mm ≒ 60px 分を差し引く
+  var PAGE_W = 794 - 60;
+  var PAGE_H = 1123 - 60;
+
+  var header = document.querySelector('.print-header');
+  var headerH = header ? header.offsetHeight + 8 : 0;
+  var usableH = PAGE_H - headerH;
+
+  var wrapper = document.getElementById('scaleWrapper');
+  var tbl = wrapper.querySelector('table');
+  var natW = tbl.scrollWidth;
+  var natH = tbl.scrollHeight;
+
+  var scaleW = PAGE_W / natW;
+  var scaleH = usableH / natH;
+  var scale  = Math.min(scaleW, scaleH, 1);
+
+  if (scale < 1) {
+    // zoom はレイアウトサイズごと縮小するため印刷ページ数を正しく制御できる
+    // (transform:scale は見た目だけ縮小しレイアウトは元サイズのまま → 2ページになる)
+    wrapper.style.zoom = scale.toFixed(4);
+  }
+
+  setTimeout(function() {
+    window.print();
+    window.close();
+  }, 500);
+};
+</script>
+</body>
+</html>`);
+        printWindow.document.close();
     }
 
     renderReservationInfo(cell, reservation) {
