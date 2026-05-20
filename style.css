@@ -2038,3 +2038,64 @@ body {
     flex-wrap: wrap;
     justify-content: center;
 }
+
+/* ========== 日次メッセージバナー ========== */
+.daily-message-banner {
+    width: 100%;
+    background: linear-gradient(135deg, #fff8e1, #ffe082);
+    border: 2px solid #f9a825;
+    border-left: 6px solid #f57f17;
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    color: #4e342e;
+    box-shadow: 0 3px 10px rgba(249, 168, 37, 0.35);
+    box-sizing: border-box;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.daily-message-banner::before {
+    content: "📢";
+    font-size: 22px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* ========== メッセージタブ ========== */
+.message-tab-desc {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border-left: 4px solid #17a2b8;
+    border-radius: 4px;
+}
+
+.message-tab-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.message-delete-btn {
+    padding: 10px 20px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.message-delete-btn:hover {
+    background: #5a6268;
+}

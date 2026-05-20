@@ -84,6 +84,7 @@
 
         <!-- 座席レイアウト -->
         <main class="main">
+            <div id="dailyMessageBanner" class="daily-message-banner" style="display:none;"></div>
             <div class="seat-layout" id="seatLayout">
             </div>
         </main>
@@ -154,6 +155,7 @@
                     <button class="admin-tab active" data-tab="bulk">一括確保</button>
                     <button class="admin-tab" data-tab="courses">コース管理</button>
                     <button class="admin-tab" data-tab="logs">ログ</button>
+                    <button class="admin-tab" data-tab="message">メッセージ</button>
                 </div>
 
                 <!-- 一括確保タブ -->
@@ -252,6 +254,23 @@
                         <button class="refresh-btn" id="refreshLogsBtn">更新</button>
                     </div>
                     <div class="logs-list" id="logsList">
+                    </div>
+                </div>
+
+                <!-- メッセージタブ -->
+                <div class="admin-tab-content" id="messageTab">
+                    <p class="message-tab-desc">選択した日付に社内共有メッセージを表示します。座席表の上部に目立つ形で表示されます。</p>
+                    <div class="form-group">
+                        <label for="messageDateSelect">日付</label>
+                        <input type="date" id="messageDateSelect">
+                    </div>
+                    <div class="form-group">
+                        <label for="messageTextarea">メッセージ</label>
+                        <textarea id="messageTextarea" placeholder="例：今日の予約は17:00まで" rows="4"></textarea>
+                    </div>
+                    <div class="message-tab-actions">
+                        <button type="button" class="submit-btn" id="saveMessageBtn">保存</button>
+                        <button type="button" class="message-delete-btn" id="deleteMessageBtn">削除</button>
                     </div>
                 </div>
             </div>

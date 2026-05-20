@@ -8,6 +8,7 @@ class BoothReservationApp {
         this.courses = [];
         this.unsubscribe = null;
         this.coursesUnsubscribe = null;
+        this.messageUnsubscribe = null;
         this.editingLog = null;
         this.selectedSeats = new Set();
         this.previewCurrentFloor = '6F';
@@ -38,6 +39,7 @@ class BoothReservationApp {
         this.loadCourses();
         this.renderSeatLayout();
         this.subscribeToReservations();
+        this.subscribeToMessage();
         this.setupModalDrag();
     }
 
@@ -47,6 +49,7 @@ class BoothReservationApp {
             this.currentDate = e.target.value;
             this.updateWeekdayDisplay();
             this.subscribeToReservations();
+            this.subscribeToMessage();
         });
 
         // 日付ナビゲーションボタン
@@ -148,6 +151,8 @@ class BoothReservationApp {
                     this.populateAdminTimeSelects();
                 } else if (e.target.dataset.tab === 'courses') {
                     this.renderCoursesList();
+                } else if (e.target.dataset.tab === 'message') {
+                    this.loadMessageForAdmin();
                 }
             });
         });
@@ -226,6 +231,19 @@ class BoothReservationApp {
         document.getElementById('deleteAllTodayBtn').addEventListener('click', () => {
             this.deleteAllTodayReservations();
         });
+
+        // メッセージタブ
+        document.getElementById('saveMessageBtn').addEventListener('click', () => {
+            this.saveMessage();
+        });
+
+        document.getElementById('deleteMessageBtn').addEventListener('click', () => {
+            this.deleteMessage();
+        });
+
+        document.getElementById('messageDateSelect').addEventListener('change', () => {
+            this.loadMessageForAdmin();
+        });
     }
 
     initializeDateSelector() {
@@ -253,6 +271,7 @@ class BoothReservationApp {
         
         this.updateWeekdayDisplay();
         this.subscribeToReservations();
+        this.subscribeToMessage();
     }
 
     updateWeekdayDisplay() {
@@ -787,10 +806,11 @@ class BoothReservationApp {
     showAdminPanel() {
         document.getElementById('adminPanel').classList.add('active');
         document.getElementById('adminDateSelect').value = this.currentDate;
+        document.getElementById('messageDateSelect').value = this.currentDate;
         document.body.style.overflow = 'hidden';
-        
+
         this.resetAdminForms();
-        
+
         this.renderSeatPickButtons();
         this.populateAdminTimeSelects();
     }
@@ -2771,6 +2791,89 @@ window.onload = function() {
         console.log(`Deleted ${targetDocs.length} related reservations`);
     }
     
+    subscribeToMessage() {
+        if (this.messageUnsubscribe) {
+            this.messageUnsubscribe();
+        }
+
+        this.messageUnsubscribe = messagesCollection.doc(this.currentDate)
+            .onSnapshot(doc => {
+                const message = doc.exists ? (doc.data().message || '') : '';
+                this.displayMessage(message);
+            });
+    }
+
+    displayMessage(message) {
+        const banner = document.getElementById('dailyMessageBanner');
+        if (!banner) return;
+
+        if (message && message.trim()) {
+            banner.textContent = message;
+            banner.style.display = 'flex';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    async loadMessageForAdmin() {
+        const date = document.getElementById('messageDateSelect').value;
+        if (!date) return;
+
+        try {
+            const doc = await messagesCollection.doc(date).get();
+            document.getElementById('messageTextarea').value =
+                doc.exists ? (doc.data().message || '') : '';
+        } catch (error) {
+            console.error('メッセージ取得エラー:', error);
+        }
+    }
+
+    async saveMessage() {
+        const date = document.getElementById('messageDateSelect').value;
+        const message = document.getElementById('messageTextarea').value.trim();
+
+        if (!date) {
+            this.showToast('日付を選択してください', 'error');
+            return;
+        }
+
+        try {
+            if (message) {
+                await messagesCollection.doc(date).set({
+                    date,
+                    message,
+                    updatedAt: new Date()
+                });
+                this.showToast('メッセージを保存しました', 'success');
+            } else {
+                await messagesCollection.doc(date).delete();
+                this.showToast('メッセージを削除しました（空のため）', 'info');
+            }
+        } catch (error) {
+            console.error('メッセージ保存エラー:', error);
+            this.showToast('保存に失敗しました', 'error');
+        }
+    }
+
+    async deleteMessage() {
+        const date = document.getElementById('messageDateSelect').value;
+        if (!date) {
+            this.showToast('日付を選択してください', 'error');
+            return;
+        }
+
+        if (!confirm(`${date} のメッセージを削除しますか？`)) return;
+
+        try {
+            await messagesCollection.doc(date).delete();
+            document.getElementById('messageTextarea').value = '';
+            this.showToast('メッセージを削除しました', 'success');
+        } catch (error) {
+            console.error('メッセージ削除エラー:', error);
+            this.showToast('削除に失敗しました', 'error');
+        }
+    }
+
     setupModalDrag() {
         const modalContents = document.querySelectorAll('.modal-content');
         

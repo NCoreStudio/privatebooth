@@ -19,6 +19,7 @@ const db = firebase.firestore();
 const reservationsCollection = db.collection('reservations');
 const coursesCollection = db.collection('courses');
 const logsCollection = db.collection('reservation_logs');
+const messagesCollection = db.collection('daily_messages');
 
 // エクスポート
 window.firebase = firebase;
@@ -26,3 +27,4 @@ window.db = db;
 window.reservationsCollection = reservationsCollection;
 window.coursesCollection = coursesCollection;
 window.logsCollection = logsCollection;
+window.messagesCollection = messagesCollection;
