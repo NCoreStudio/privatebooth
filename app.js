@@ -1743,64 +1743,183 @@ class BoothReservationApp {
         const nextDay = new Date(this.currentDate);
         nextDay.setDate(nextDay.getDate() + 1);
         const defaultDate = this.toLocalDateString(nextDay);
+        const timeStr = `${this.formatTime(reservation.startMin)}〜${this.formatTime(reservation.endMin)}`;
+        const courseStr = reservation.course ? `（${reservation.course}）` : '';
 
         modal.innerHTML = `
-            <div class="modal-content" style="max-width:380px;">
+            <div class="modal-content dup-modal-content">
                 <div class="modal-header">
-                    <h3>予約を別日に複製</h3>
-                    <button class="close-btn" onclick="document.getElementById('duplicateReservationModal').remove()">×</button>
+                    <h3>予約を複製</h3>
+                    <button class="close-btn" id="closeDupModalBtn">×</button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom:15px;color:#555;font-size:14px;">
-                        <strong>${reservation.name}</strong>（席${reservation.seatNo} / ${this.formatTime(reservation.startMin)}-${this.formatTime(reservation.endMin)}）<br>
-                        を別の日付に複製します。
-                    </p>
+                    <div class="dup-source-info">
+                        <span class="dup-source-label">複製元</span>
+                        <strong>${reservation.name}</strong>　席${reservation.seatNo}　${timeStr}${courseStr}
+                    </div>
                     <div class="form-group">
-                        <label>複製先の日付 *</label>
+                        <label for="duplicateTargetDate">複製先の日付 *</label>
                         <input type="date" id="duplicateTargetDate" value="${defaultDate}">
+                    </div>
+                    <div class="form-group">
+                        <label>複製先の席 * <span id="dupSeatHint" class="dup-seat-hint"></span></label>
+                        <div id="duplicateSeatPicker" class="dup-seat-picker">
+                            <p class="dup-loading">読み込み中...</p>
+                        </div>
+                        <div class="dup-seat-legend">
+                            <span><span class="dup-legend-dot available"></span>空き（選択可）</span>
+                            <span><span class="dup-legend-dot occupied"></span>予約あり（選択不可）</span>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="submit-btn">複製する</button>
-                    <button class="cancel-btn" onclick="document.getElementById('duplicateReservationModal').remove()">キャンセル</button>
+                    <button class="submit-btn" id="dupSubmitBtn" disabled>複製する</button>
+                    <button class="cancel-btn" id="dupCancelBtn">キャンセル</button>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        const submitBtn = modal.querySelector('.submit-btn');
-        submitBtn.addEventListener('click', () => {
+        let selectedSeatNo = null;
+
+        const close = () => modal.remove();
+        document.getElementById('closeDupModalBtn').addEventListener('click', close);
+        document.getElementById('dupCancelBtn').addEventListener('click', close);
+
+        document.getElementById('dupSubmitBtn').addEventListener('click', () => {
             const targetDate = document.getElementById('duplicateTargetDate').value;
-            this.executeDuplicateReservation(reservation, targetDate);
+            if (!selectedSeatNo) { this.showToast('席を選択してください', 'error'); return; }
+            this.executeDuplicateReservation(reservation, targetDate, selectedSeatNo);
         });
+
+        const refreshSeats = async () => {
+            const targetDate = document.getElementById('duplicateTargetDate').value;
+            const picker    = document.getElementById('duplicateSeatPicker');
+            const hint      = document.getElementById('dupSeatHint');
+            const submitBtn = document.getElementById('dupSubmitBtn');
+
+            selectedSeatNo = null;
+            submitBtn.disabled = true;
+            if (hint) hint.textContent = '';
+
+            if (!targetDate) {
+                picker.innerHTML = '<p class="dup-loading">日付を選択してください</p>';
+                return;
+            }
+            if (targetDate === reservation.date) {
+                picker.innerHTML = '<p class="dup-error">複製元と同じ日付は選択できません</p>';
+                return;
+            }
+
+            picker.innerHTML = '<p class="dup-loading">空き状況を確認中...</p>';
+
+            try {
+                const occupiedSeats = await this.loadDuplicateSeatAvailability(reservation, targetDate);
+                const maxSeat = reservation.floor === '6F' ? 30 : 19;
+                const availableCount = maxSeat - occupiedSeats.size;
+
+                if (hint) hint.textContent = availableCount > 0 ? `（空き ${availableCount} 席）` : '（空き席なし）';
+
+                // 元と同じ席が空いていればデフォルト、塞がっていれば若番の空き席
+                let defaultSeat = null;
+                if (!occupiedSeats.has(reservation.seatNo)) {
+                    defaultSeat = reservation.seatNo;
+                } else {
+                    for (let i = 1; i <= maxSeat; i++) {
+                        if (!occupiedSeats.has(i)) { defaultSeat = i; break; }
+                    }
+                }
+                selectedSeatNo = defaultSeat;
+
+                this.renderDuplicateSeatPicker(reservation, occupiedSeats, selectedSeatNo, (no) => {
+                    selectedSeatNo = no;
+                    submitBtn.disabled = false;
+                });
+
+                submitBtn.disabled = !selectedSeatNo;
+            } catch (err) {
+                console.error('席情報取得エラー:', err);
+                picker.innerHTML = '<p class="dup-error">読み込みに失敗しました</p>';
+            }
+        };
+
+        document.getElementById('duplicateTargetDate').addEventListener('change', refreshSeats);
+        refreshSeats();
     }
 
-    async executeDuplicateReservation(reservation, targetDate) {
+    async loadDuplicateSeatAvailability(reservation, targetDate) {
+        const snapshot = await reservationsCollection
+            .where('date', '==', targetDate)
+            .where('floor', '==', reservation.floor)
+            .get();
+
+        const occupiedSeats = new Set();
+        snapshot.docs.forEach(doc => {
+            const r = doc.data();
+            if (!(reservation.endMin <= r.startMin || reservation.startMin >= r.endMin)) {
+                occupiedSeats.add(r.seatNo);
+            }
+        });
+        return occupiedSeats;
+    }
+
+    renderDuplicateSeatPicker(reservation, occupiedSeats, defaultSeatNo, onSelect) {
+        const container = document.getElementById('duplicateSeatPicker');
+        container.innerHTML = '';
+
+        const maxSeat = reservation.floor === '6F' ? 30 : 19;
+
+        for (let i = 1; i <= maxSeat; i++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = i;
+            btn.dataset.seat = i;
+            btn.className = 'dup-seat-btn';
+
+            if (occupiedSeats.has(i)) {
+                btn.classList.add('occupied');
+                btn.disabled = true;
+                btn.title = '予約あり（選択不可）';
+            } else {
+                btn.classList.add('available');
+                if (i === defaultSeatNo) btn.classList.add('selected');
+                btn.addEventListener('click', () => {
+                    container.querySelectorAll('.dup-seat-btn.selected').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    onSelect(i);
+                });
+            }
+            container.appendChild(btn);
+        }
+    }
+
+    async executeDuplicateReservation(reservation, targetDate, targetSeatNo) {
         if (!targetDate) {
             this.showToast('複製先の日付を選択してください', 'error');
             return;
         }
-
         if (targetDate === reservation.date) {
             this.showToast('同じ日付には複製できません（別の日を選択してください）', 'error');
             return;
         }
 
+        const seatNo = targetSeatNo != null ? targetSeatNo : reservation.seatNo;
+
         try {
             const conflicts = await this.checkConflictsForDate(
-                targetDate, reservation.floor, reservation.seatNo,
+                targetDate, reservation.floor, seatNo,
                 reservation.startMin, reservation.endMin
             );
             if (conflicts.length > 0) {
-                this.showToast('複製先の席・時間帯が重複しています', 'error');
+                this.showToast('選択した席・時間帯が重複しています', 'error');
                 return;
             }
 
             const newReservation = {
                 date: targetDate,
                 floor: reservation.floor,
-                seatNo: reservation.seatNo,
+                seatNo: seatNo,
                 startMin: reservation.startMin,
                 endMin: reservation.endMin,
                 name: reservation.name,
@@ -1812,7 +1931,10 @@ class BoothReservationApp {
             };
 
             await reservationsCollection.add(newReservation);
-            this.showToast(`${targetDate} に複製しました`, 'success');
+            const seatLabel = seatNo !== reservation.seatNo
+                ? `席${seatNo}（元：席${reservation.seatNo}）`
+                : `席${seatNo}`;
+            this.showToast(`${targetDate} ${seatLabel} に複製しました`, 'success');
             document.getElementById('duplicateReservationModal').remove();
         } catch (error) {
             console.error('複製エラー:', error);
