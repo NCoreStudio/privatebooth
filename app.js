@@ -9,6 +9,8 @@ class BoothReservationApp {
         this.unsubscribe = null;
         this.coursesUnsubscribe = null;
         this.messageUnsubscribe = null;
+        this.dragSourceSeatNo = null;
+        this._lastDragOverEl = null;
         this.editingLog = null;
         this.selectedSeats = new Set();
         this.previewCurrentFloor = '6F';
@@ -40,6 +42,7 @@ class BoothReservationApp {
         this.renderSeatLayout();
         this.subscribeToReservations();
         this.subscribeToMessage();
+        this.initSeatDragDropDelegated();
         this.setupModalDrag();
     }
 
@@ -573,7 +576,7 @@ class BoothReservationApp {
         });
 
         // DOM描画後にフォントを自動縮小して枠内に収める
-        requestAnimationFrame(() => { this.fitAllSeatText(); });
+        requestAnimationFrame(() => { this.fitAllSeatText(); this.updateSeatDraggable(); });
     }
 
     /**
@@ -2871,6 +2874,146 @@ window.onload = function() {
         } catch (error) {
             console.error('メッセージ削除エラー:', error);
             this.showToast('削除に失敗しました', 'error');
+        }
+    }
+
+    // ===== 座席ドラッグ＆ドロップ =====
+
+    initSeatDragDropDelegated() {
+        const seatLayout = document.getElementById('seatLayout');
+        if (!seatLayout || seatLayout._dndReady) return;
+        seatLayout._dndReady = true;
+
+        seatLayout.addEventListener('dragstart', (e) => {
+            const seatEl = e.target.closest('.seat');
+            if (!seatEl) return;
+            this.onSeatDragStart(e, seatEl);
+        });
+
+        seatLayout.addEventListener('dragend', () => {
+            this.onSeatDragEnd();
+        });
+
+        seatLayout.addEventListener('dragover', (e) => {
+            const seatEl = e.target.closest('.seat');
+            if (!seatEl || !this.dragSourceSeatNo) return;
+            e.preventDefault();
+            this.onSeatDragOver(e, seatEl);
+        });
+
+        seatLayout.addEventListener('dragleave', (e) => {
+            const seatEl = e.target.closest('.seat');
+            if (!seatEl || seatEl.contains(e.relatedTarget)) return;
+            seatEl.classList.remove('seat-drag-over-valid', 'seat-drag-over-invalid');
+        });
+
+        seatLayout.addEventListener('drop', (e) => {
+            const seatEl = e.target.closest('.seat');
+            if (!seatEl) return;
+            e.preventDefault();
+            this.onSeatDrop(seatEl);
+        });
+    }
+
+    updateSeatDraggable() {
+        document.querySelectorAll('.seat').forEach(seatEl => {
+            const seatNo = parseInt(seatEl.dataset.seat);
+            seatEl.draggable = this.reservations.some(r => r.seatNo === seatNo);
+        });
+    }
+
+    onSeatDragStart(e, seatEl) {
+        const seatNo = parseInt(seatEl.dataset.seat);
+        if (!this.reservations.some(r => r.seatNo === seatNo)) return;
+
+        this.dragSourceSeatNo = seatNo;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(seatNo));
+
+        // 持ち上げ感のあるカスタムゴースト
+        const rect = seatEl.getBoundingClientRect();
+        const ghost = seatEl.cloneNode(true);
+        Object.assign(ghost.style, {
+            position:     'fixed',
+            left:         `${rect.left}px`,
+            top:          `${rect.top}px`,
+            width:        `${rect.width}px`,
+            height:       `${rect.height}px`,
+            margin:       '0',
+            transform:    'rotate(-4deg) scale(1.14)',
+            boxShadow:    '0 22px 52px rgba(0,0,0,0.45)',
+            opacity:      '0.96',
+            pointerEvents:'none',
+            zIndex:       '-1',
+            borderRadius: '8px',
+            transition:   'none',
+        });
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, rect.width / 2, rect.height / 2);
+
+        setTimeout(() => {
+            seatEl.classList.add('seat-dragging');
+            ghost.remove();
+        }, 0);
+    }
+
+    onSeatDragOver(e, seatEl) {
+        const targetNo = parseInt(seatEl.dataset.seat);
+        if (targetNo === this.dragSourceSeatNo) return;
+
+        // 前回ホバーしていた席のスタイルをクリア
+        if (this._lastDragOverEl && this._lastDragOverEl !== seatEl) {
+            this._lastDragOverEl.classList.remove('seat-drag-over-valid', 'seat-drag-over-invalid');
+        }
+        this._lastDragOverEl = seatEl;
+
+        const occupied = this.reservations.some(r => r.seatNo === targetNo);
+        if (occupied) {
+            seatEl.classList.add('seat-drag-over-invalid');
+            seatEl.classList.remove('seat-drag-over-valid');
+            e.dataTransfer.dropEffect = 'none';
+        } else {
+            seatEl.classList.add('seat-drag-over-valid');
+            seatEl.classList.remove('seat-drag-over-invalid');
+            e.dataTransfer.dropEffect = 'move';
+        }
+    }
+
+    onSeatDragEnd() {
+        document.querySelectorAll('.seat').forEach(s => {
+            s.classList.remove('seat-dragging', 'seat-drag-over-valid', 'seat-drag-over-invalid');
+        });
+        this.dragSourceSeatNo = null;
+        this._lastDragOverEl = null;
+    }
+
+    async onSeatDrop(seatEl) {
+        const targetNo = parseInt(seatEl.dataset.seat);
+        const sourceNo = this.dragSourceSeatNo;
+
+        this.onSeatDragEnd();
+
+        if (!sourceNo || targetNo === sourceNo) return;
+
+        // 移動先に予約があればキャンセル（確認なし・サイレント）
+        if (this.reservations.some(r => r.seatNo === targetNo)) return;
+
+        const toMove = this.reservations.filter(r => r.seatNo === sourceNo);
+        if (toMove.length === 0) return;
+
+        try {
+            const batch = db.batch();
+            toMove.forEach(r => {
+                batch.update(reservationsCollection.doc(r.id), {
+                    seatNo: targetNo,
+                    updatedAt: new Date()
+                });
+            });
+            await batch.commit();
+            this.showToast(`席${sourceNo} → 席${targetNo} に移動しました`, 'success');
+        } catch (error) {
+            console.error('席移動エラー:', error);
+            this.showToast('移動に失敗しました', 'error');
         }
     }
 
