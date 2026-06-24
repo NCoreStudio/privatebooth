@@ -1576,14 +1576,20 @@ class BoothReservationApp {
                         <textarea id="editResNote">${reservation.note || ''}</textarea>
                     </div>
                     <div class="form-group">
-                        <label>開始時刻</label>
-                        <div id="editResStartWrap"></div>
-                        <input type="hidden" id="editResStart" value="${reservation.startMin}">
-                    </div>
-                    <div class="form-group">
-                        <label>終了時刻</label>
-                        <div id="editResEndWrap"></div>
-                        <input type="hidden" id="editResEnd" value="${reservation.endMin}">
+                        <label>時刻</label>
+                        <div class="time-row">
+                            <div class="time-col">
+                                <span class="time-col-label">開始</span>
+                                <div id="editResStartWrap"></div>
+                                <input type="hidden" id="editResStart" value="${reservation.startMin}">
+                            </div>
+                            <div class="time-col-sep">〜</div>
+                            <div class="time-col">
+                                <span class="time-col-label">終了</span>
+                                <div id="editResEndWrap"></div>
+                                <input type="hidden" id="editResEnd" value="${reservation.endMin}">
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>席の移動</label>
@@ -3027,7 +3033,7 @@ window.onload = function() {
         wrap.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            set(current + (e.deltaY < 0 ? step : -step));
+            set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
         wrap.appendChild(upBtn);

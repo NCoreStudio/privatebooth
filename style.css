@@ -2157,6 +2157,32 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* 時刻スピナー横並びレイアウト */
+.time-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.time-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.time-col-label {
+    font-size: 11px;
+    color: #888;
+    font-weight: 500;
+}
+
+.time-col-sep {
+    font-size: 18px;
+    color: #aaa;
+    margin-top: 18px;
+}
+
 /* ========== 複製モーダル ========== */
 .dup-modal-content {
     max-width: 480px;

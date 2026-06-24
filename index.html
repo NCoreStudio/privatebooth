@@ -123,14 +123,20 @@
                     <textarea id="sideNoteTextarea" placeholder="準備物を記入" style="display: none;"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>開始時刻 *</label>
-                    <div id="sideStartSpinnerWrap"></div>
-                    <input type="hidden" id="sideStartTimeSelect">
-                </div>
-                <div class="form-group">
-                    <label>終了時刻 *</label>
-                    <div id="sideEndSpinnerWrap"></div>
-                    <input type="hidden" id="sideEndTimeSelect">
+                    <label>時刻 *</label>
+                    <div class="time-row">
+                        <div class="time-col">
+                            <span class="time-col-label">開始</span>
+                            <div id="sideStartSpinnerWrap"></div>
+                            <input type="hidden" id="sideStartTimeSelect">
+                        </div>
+                        <div class="time-col-sep">〜</div>
+                        <div class="time-col">
+                            <span class="time-col-label">終了</span>
+                            <div id="sideEndSpinnerWrap"></div>
+                            <input type="hidden" id="sideEndTimeSelect">
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <button class="submit-btn" id="sideSubmitBtn">予約登録</button>
@@ -179,14 +185,20 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>開始時刻</label>
-                        <div id="adminStartSpinnerWrap"></div>
-                        <input type="hidden" id="adminStartTimeSelect">
-                    </div>
-                    <div class="form-group">
-                        <label>終了時刻</label>
-                        <div id="adminEndSpinnerWrap"></div>
-                        <input type="hidden" id="adminEndTimeSelect">
+                        <label>時刻</label>
+                        <div class="time-row">
+                            <div class="time-col">
+                                <span class="time-col-label">開始</span>
+                                <div id="adminStartSpinnerWrap"></div>
+                                <input type="hidden" id="adminStartTimeSelect">
+                            </div>
+                            <div class="time-col-sep">〜</div>
+                            <div class="time-col">
+                                <span class="time-col-label">終了</span>
+                                <div id="adminEndSpinnerWrap"></div>
+                                <input type="hidden" id="adminEndTimeSelect">
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="adminNameInput">予約名 *</label>
