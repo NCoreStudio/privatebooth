@@ -3036,6 +3036,13 @@ window.onload = function() {
             set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
+        // 矢印キー: ↓で増加、↑で減少（ホイールと同方向）
+        wrap.setAttribute('tabindex', '0');
+        wrap.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
+            if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
+        });
+
         wrap.appendChild(upBtn);
         wrap.appendChild(display);
         wrap.appendChild(downBtn);

@@ -389,6 +389,39 @@ body {
     background: #f8f9fa;
 }
 
+/* サイドパネル内フォームをコンパクト化して予約登録ボタンを最初から表示 */
+.side-panel .panel-header {
+    padding: 10px 20px;
+}
+.side-panel .panel-body {
+    padding: 12px 16px;
+}
+.side-panel .form-group {
+    margin-bottom: 10px;
+}
+.side-panel .form-group label {
+    margin-bottom: 3px;
+    font-size: 13px;
+}
+.side-panel .form-group input,
+.side-panel .form-group select {
+    padding: 7px 10px;
+}
+.side-panel .seat-info-display {
+    padding: 7px 10px;
+    margin-bottom: 0;
+}
+.side-panel .ts-btn {
+    height: 22px;
+}
+.side-panel .ts-display {
+    font-size: 20px;
+    padding: 5px 0;
+}
+.side-panel .purpose-options {
+    gap: 8px;
+}
+
 .seat-info-display {
     background: #e3f2fd;
     padding: 10px;
