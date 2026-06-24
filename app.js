@@ -3015,10 +3015,10 @@ window.onload = function() {
 
         const upBtn = document.createElement('button');
         upBtn.type = 'button';
-        upBtn.tabIndex = -1; // マウスクリックのみ・キーボードフォーカス不可
         upBtn.className = 'ts-btn ts-up';
         upBtn.textContent = '▲';
-        upBtn.addEventListener('click', (e) => { e.preventDefault(); set(current + step); wrap.focus(); });
+        // mousedown + preventDefault でブラウザのフォーカス移動を抑制し wrap フォーカスを維持
+        upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); set(current + step); wrap.focus(); });
 
         const display = document.createElement('div');
         display.className = 'ts-display';
@@ -3026,12 +3026,11 @@ window.onload = function() {
 
         const downBtn = document.createElement('button');
         downBtn.type = 'button';
-        downBtn.tabIndex = -1; // マウスクリックのみ・キーボードフォーカス不可
         downBtn.className = 'ts-btn ts-down';
         downBtn.textContent = '▼';
-        downBtn.addEventListener('click', (e) => { e.preventDefault(); set(current - step); wrap.focus(); });
+        downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); set(current - step); wrap.focus(); });
 
-        // マウスホイールでスクロール（プルダウン不要）
+        // マウスホイールでスクロール
         wrap.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -3039,7 +3038,6 @@ window.onload = function() {
         }, { passive: false });
 
         // 矢印キー: ↓で増加、↑で減少
-        // ボタンをtabIndex=-1にしてフォーカスをwrapに集約することで干渉を排除
         wrap.setAttribute('tabindex', '0');
         wrap.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
