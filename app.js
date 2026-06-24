@@ -11,6 +11,10 @@ class BoothReservationApp {
         this.messageUnsubscribe = null;
         this.dragSourceSeatNo = null;
         this._lastDragOverEl = null;
+        this.sideStartSpinner = null;
+        this.sideEndSpinner   = null;
+        this.adminStartSpinner = null;
+        this.adminEndSpinner   = null;
         this.editingLog = null;
         this.selectedSeats = new Set();
         this.previewCurrentFloor = '6F';
@@ -44,6 +48,22 @@ class BoothReservationApp {
         this.subscribeToMessage();
         this.initSeatDragDropDelegated();
         this.setupModalDrag();
+
+        // 時刻スピナー初期化
+        this.sideStartSpinner = this.createTimeSpinner(
+            'sideStartSpinnerWrap', 'sideStartTimeSelect', 9 * 60,
+            { onChange: (val, old) => this.onSideStartTimeChange(val, old) }
+        );
+        this.sideEndSpinner = this.createTimeSpinner(
+            'sideEndSpinnerWrap', 'sideEndTimeSelect', 9 * 60 + 30
+        );
+        this.adminStartSpinner = this.createTimeSpinner(
+            'adminStartSpinnerWrap', 'adminStartTimeSelect', 9 * 60,
+            { onChange: (val, old) => this.onAdminStartTimeChange(val, old) }
+        );
+        this.adminEndSpinner = this.createTimeSpinner(
+            'adminEndSpinnerWrap', 'adminEndTimeSelect', 9 * 60 + 30
+        );
     }
 
     setupEventListeners() {
@@ -659,8 +679,8 @@ class BoothReservationApp {
         document.getElementById('sideNoteTextarea').value = '';
         document.getElementById('sideNoteTextarea').style.display = 'none';
         
-        document.getElementById('sideStartTimeSelect').value = 9 * 60;
-        document.getElementById('sideEndTimeSelect').value = 10 * 60;
+        if (this.sideStartSpinner) this.sideStartSpinner.setValue(9 * 60);
+        if (this.sideEndSpinner)   this.sideEndSpinner.setValue(9 * 60 + 30);
     }
 
     resetAdminForms() {
@@ -877,28 +897,8 @@ class BoothReservationApp {
     }
 
     populateAdminTimeSelects() {
-        const startSelect = document.getElementById('adminStartTimeSelect');
-        const endSelect = document.getElementById('adminEndTimeSelect');
-        
-        startSelect.innerHTML = '';
-        endSelect.innerHTML = '';
-        
-        for (let minutes = 9 * 60; minutes <= 21 * 60; minutes += 30) {
-            const timeStr = this.formatTime(minutes);
-            
-            const startOption = document.createElement('option');
-            startOption.value = minutes;
-            startOption.textContent = timeStr;
-            startSelect.appendChild(startOption);
-            
-            const endOption = document.createElement('option');
-            endOption.value = minutes;
-            endOption.textContent = timeStr;
-            endSelect.appendChild(endOption);
-        }
-        
-        startSelect.value = 9 * 60;
-        endSelect.value = 10 * 60;
+        if (this.adminStartSpinner) this.adminStartSpinner.setValue(9 * 60);
+        if (this.adminEndSpinner)   this.adminEndSpinner.setValue(9 * 60 + 30);
     }
 
     async bulkReserve() {
@@ -1540,14 +1540,6 @@ class BoothReservationApp {
         modal.className = 'modal active';
         modal.id = 'editReservationModal';
 
-        let startOptions = '';
-        let endOptions = '';
-        for (let m = 9 * 60; m <= 21 * 60; m += 30) {
-            const t = this.formatTime(m);
-            startOptions += `<option value="${m}" ${reservation.startMin === m ? 'selected' : ''}>${t}</option>`;
-            endOptions += `<option value="${m}" ${reservation.endMin === m ? 'selected' : ''}>${t}</option>`;
-        }
-
         const maxSeat = this.currentFloor === '6F' ? 30 : 19;
         let seatOptions = '';
         for (let i = 1; i <= maxSeat; i++) {
@@ -1585,11 +1577,13 @@ class BoothReservationApp {
                     </div>
                     <div class="form-group">
                         <label>開始時刻</label>
-                        <select id="editResStart">${startOptions}</select>
+                        <div id="editResStartWrap"></div>
+                        <input type="hidden" id="editResStart" value="${reservation.startMin}">
                     </div>
                     <div class="form-group">
                         <label>終了時刻</label>
-                        <select id="editResEnd">${endOptions}</select>
+                        <div id="editResEndWrap"></div>
+                        <input type="hidden" id="editResEnd" value="${reservation.endMin}">
                     </div>
                     <div class="form-group">
                         <label>席の移動</label>
@@ -1604,6 +1598,19 @@ class BoothReservationApp {
         `;
 
         document.body.appendChild(modal);
+
+        // 編集モーダルの時刻スピナー（開始変更時に終了を自動追従）
+        let editEndSpinner;
+        const editStartSpinner = this.createTimeSpinner(
+            'editResStartWrap', 'editResStart', reservation.startMin, {
+                onChange: (val, old) => {
+                    const curEnd = parseInt(document.getElementById('editResEnd').value) || old + 30;
+                    const gap = Math.max(curEnd - old, 30);
+                    if (editEndSpinner) editEndSpinner.setValue(Math.min(val + gap, 21 * 60));
+                }
+            }
+        );
+        editEndSpinner = this.createTimeSpinner('editResEndWrap', 'editResEnd', reservation.endMin);
 
         const editContainer = document.getElementById('editResCourseContainer');
         if (editContainer) {
@@ -1970,33 +1977,8 @@ class BoothReservationApp {
     }
 
     populateSideTimeSelects() {
-        const startSelect = document.getElementById('sideStartTimeSelect');
-        const endSelect = document.getElementById('sideEndTimeSelect');
-        
-        if (!startSelect || !endSelect) {
-            console.error('Time select elements not found');
-            return;
-        }
-        
-        startSelect.innerHTML = '';
-        endSelect.innerHTML = '';
-        
-        for (let minutes = 9 * 60; minutes <= 21 * 60; minutes += 30) {
-            const timeStr = this.formatTime(minutes);
-            
-            const startOption = document.createElement('option');
-            startOption.value = minutes;
-            startOption.textContent = timeStr;
-            startSelect.appendChild(startOption);
-            
-            const endOption = document.createElement('option');
-            endOption.value = minutes;
-            endOption.textContent = timeStr;
-            endSelect.appendChild(endOption);
-        }
-        
-        startSelect.value = 9 * 60;
-        endSelect.value = 10 * 60;
+        if (this.sideStartSpinner) this.sideStartSpinner.setValue(9 * 60);
+        if (this.sideEndSpinner)   this.sideEndSpinner.setValue(9 * 60 + 30);
     }
 
     async deleteAllTodayReservations() {
@@ -2255,17 +2237,14 @@ class BoothReservationApp {
         }
         
         this.renderSeatPickButtons();
-        this.populateAdminTimeSelects();  // オプションを生成
-        
-        // 2. 生成後に値を設定（[FIX⑦] 順序修正）
-        const startTimeSelect = document.getElementById('adminStartTimeSelect');
-        const endTimeSelect = document.getElementById('adminEndTimeSelect');
-        
-        if (startTimeSelect && params.startMin !== undefined) {
-            startTimeSelect.value = params.startMin;
+        this.populateAdminTimeSelects();  // スピナーを初期値にリセット
+
+        // 2. リセット後に実際の値を設定
+        if (this.adminStartSpinner && params.startMin !== undefined) {
+            this.adminStartSpinner.setValue(params.startMin);
         }
-        if (endTimeSelect && params.endMin !== undefined) {
-            endTimeSelect.value = params.endMin;
+        if (this.adminEndSpinner && params.endMin !== undefined) {
+            this.adminEndSpinner.setValue(params.endMin);
         }
         
         // 繰り返し予約の場合は設定を復元
@@ -2997,6 +2976,81 @@ window.onload = function() {
             console.error('メッセージ削除エラー:', error);
             this.showToast('削除に失敗しました', 'error');
         }
+    }
+
+    // ===== 時刻スピナー =====
+
+    createTimeSpinner(containerId, hiddenId, initialMin, { minVal = 9*60, maxVal = 21*60, step = 30, onChange } = {}) {
+        const container = document.getElementById(containerId);
+        const hidden    = document.getElementById(hiddenId);
+        if (!container || !hidden) return null;
+
+        let current = Math.max(minVal, Math.min(maxVal, initialMin));
+
+        const fmt = (m) => {
+            const h  = Math.floor(m / 60);
+            const mm = m % 60;
+            return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+        };
+
+        const set = (val) => {
+            const clamped = Math.max(minVal, Math.min(maxVal, Math.round(val / step) * step));
+            if (clamped === current) return;
+            const old = current;
+            current = clamped;
+            display.textContent = fmt(current);
+            hidden.value = current;
+            if (onChange) onChange(current, old);
+        };
+
+        container.innerHTML = '';
+        const wrap = document.createElement('div');
+        wrap.className = 'time-spinner';
+
+        const upBtn = document.createElement('button');
+        upBtn.type = 'button';
+        upBtn.className = 'ts-btn ts-up';
+        upBtn.textContent = '▲';
+        upBtn.addEventListener('click', (e) => { e.preventDefault(); set(current + step); });
+
+        const display = document.createElement('div');
+        display.className = 'ts-display';
+        display.textContent = fmt(current);
+
+        const downBtn = document.createElement('button');
+        downBtn.type = 'button';
+        downBtn.className = 'ts-btn ts-down';
+        downBtn.textContent = '▼';
+        downBtn.addEventListener('click', (e) => { e.preventDefault(); set(current - step); });
+
+        // マウスホイールでスクロール（プルダウン不要）
+        wrap.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            set(current + (e.deltaY < 0 ? step : -step));
+        }, { passive: false });
+
+        wrap.appendChild(upBtn);
+        wrap.appendChild(display);
+        wrap.appendChild(downBtn);
+        container.appendChild(wrap);
+        hidden.value = current;
+
+        return { getValue: () => current, setValue: (v) => set(v) };
+    }
+
+    onSideStartTimeChange(newVal, oldVal) {
+        if (!this.sideEndSpinner) return;
+        const curEnd = parseInt(document.getElementById('sideEndTimeSelect').value) || oldVal + 30;
+        const gap    = Math.max(curEnd - oldVal, 30);
+        this.sideEndSpinner.setValue(Math.min(newVal + gap, 21 * 60));
+    }
+
+    onAdminStartTimeChange(newVal, oldVal) {
+        if (!this.adminEndSpinner) return;
+        const curEnd = parseInt(document.getElementById('adminEndTimeSelect').value) || oldVal + 30;
+        const gap    = Math.max(curEnd - oldVal, 30);
+        this.adminEndSpinner.setValue(Math.min(newVal + gap, 21 * 60));
     }
 
     // ===== 座席ドラッグ＆ドロップ =====

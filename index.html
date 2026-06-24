@@ -123,12 +123,14 @@
                     <textarea id="sideNoteTextarea" placeholder="準備物を記入" style="display: none;"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="sideStartTimeSelect">開始時刻 *</label>
-                    <select id="sideStartTimeSelect" required></select>
+                    <label>開始時刻 *</label>
+                    <div id="sideStartSpinnerWrap"></div>
+                    <input type="hidden" id="sideStartTimeSelect">
                 </div>
                 <div class="form-group">
-                    <label for="sideEndTimeSelect">終了時刻 *</label>
-                    <select id="sideEndTimeSelect" required></select>
+                    <label>終了時刻 *</label>
+                    <div id="sideEndSpinnerWrap"></div>
+                    <input type="hidden" id="sideEndTimeSelect">
                 </div>
                 <div class="form-group">
                     <button class="submit-btn" id="sideSubmitBtn">予約登録</button>
@@ -177,12 +179,14 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="adminStartTimeSelect">開始時刻</label>
-                        <select id="adminStartTimeSelect"></select>
+                        <label>開始時刻</label>
+                        <div id="adminStartSpinnerWrap"></div>
+                        <input type="hidden" id="adminStartTimeSelect">
                     </div>
                     <div class="form-group">
-                        <label for="adminEndTimeSelect">終了時刻</label>
-                        <select id="adminEndTimeSelect"></select>
+                        <label>終了時刻</label>
+                        <div id="adminEndSpinnerWrap"></div>
+                        <input type="hidden" id="adminEndTimeSelect">
                     </div>
                     <div class="form-group">
                         <label for="adminNameInput">予約名 *</label>
