@@ -3037,11 +3037,15 @@ window.onload = function() {
         }, { passive: false });
 
         // 矢印キー: ↓で増加、↑で減少（ホイールと同方向）
-        wrap.setAttribute('tabindex', '0');
-        wrap.addEventListener('keydown', (e) => {
+        // wrap自体・ボタン両方に付ける（フォーカス位置を問わず確実に動作させるため）
+        const handleArrowKey = (e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
             if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
-        });
+        };
+        upBtn.addEventListener('keydown', handleArrowKey);
+        downBtn.addEventListener('keydown', handleArrowKey);
+        wrap.setAttribute('tabindex', '0');
+        wrap.addEventListener('keydown', handleArrowKey);
 
         wrap.appendChild(upBtn);
         wrap.appendChild(display);
