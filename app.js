@@ -3015,9 +3015,10 @@ window.onload = function() {
 
         const upBtn = document.createElement('button');
         upBtn.type = 'button';
+        upBtn.tabIndex = -1; // マウスクリックのみ・キーボードフォーカス不可
         upBtn.className = 'ts-btn ts-up';
         upBtn.textContent = '▲';
-        upBtn.addEventListener('click', (e) => { e.preventDefault(); set(current + step); });
+        upBtn.addEventListener('click', (e) => { e.preventDefault(); set(current + step); wrap.focus(); });
 
         const display = document.createElement('div');
         display.className = 'ts-display';
@@ -3025,9 +3026,10 @@ window.onload = function() {
 
         const downBtn = document.createElement('button');
         downBtn.type = 'button';
+        downBtn.tabIndex = -1; // マウスクリックのみ・キーボードフォーカス不可
         downBtn.className = 'ts-btn ts-down';
         downBtn.textContent = '▼';
-        downBtn.addEventListener('click', (e) => { e.preventDefault(); set(current - step); });
+        downBtn.addEventListener('click', (e) => { e.preventDefault(); set(current - step); wrap.focus(); });
 
         // マウスホイールでスクロール（プルダウン不要）
         wrap.addEventListener('wheel', (e) => {
@@ -3036,14 +3038,13 @@ window.onload = function() {
             set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
-        // 矢印キー: ↓で増加、↑で減少（キャプチャフェーズでボタンより先に処理）
+        // 矢印キー: ↓で増加、↑で減少
+        // ボタンをtabIndex=-1にしてフォーカスをwrapに集約することで干渉を排除
         wrap.setAttribute('tabindex', '0');
         wrap.addEventListener('keydown', (e) => {
-            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-            e.preventDefault();
-            e.stopPropagation();
-            set(current + (e.key === 'ArrowDown' ? step : -step));
-        }, true); // true = キャプチャフェーズ（子要素より先に発火）
+            if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
+            if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
+        });
 
         wrap.appendChild(upBtn);
         wrap.appendChild(display);
