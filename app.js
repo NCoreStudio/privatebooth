@@ -3036,16 +3036,14 @@ window.onload = function() {
             set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
-        // 矢印キー: ↓で増加、↑で減少（ホイールと同方向）
-        // wrap自体・ボタン両方に付ける（フォーカス位置を問わず確実に動作させるため）
-        const handleArrowKey = (e) => {
-            if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
-            if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
-        };
-        upBtn.addEventListener('keydown', handleArrowKey);
-        downBtn.addEventListener('keydown', handleArrowKey);
+        // 矢印キー: ↓で増加、↑で減少（キャプチャフェーズでボタンより先に処理）
         wrap.setAttribute('tabindex', '0');
-        wrap.addEventListener('keydown', handleArrowKey);
+        wrap.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            e.stopPropagation();
+            set(current + (e.key === 'ArrowDown' ? step : -step));
+        }, true); // true = キャプチャフェーズ（子要素より先に発火）
 
         wrap.appendChild(upBtn);
         wrap.appendChild(display);
