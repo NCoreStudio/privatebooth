@@ -3013,40 +3013,24 @@ window.onload = function() {
         const wrap = document.createElement('div');
         wrap.className = 'time-spinner';
 
-        const upBtn = document.createElement('button');
-        upBtn.type = 'button';
-        upBtn.className = 'ts-btn ts-up';
-        upBtn.textContent = '▲';
-        // mousedown + preventDefault でブラウザのフォーカス移動を抑制し wrap フォーカスを維持
-        upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); set(current + step); wrap.focus(); });
-
         const display = document.createElement('div');
         display.className = 'ts-display';
         display.textContent = fmt(current);
 
-        const downBtn = document.createElement('button');
-        downBtn.type = 'button';
-        downBtn.className = 'ts-btn ts-down';
-        downBtn.textContent = '▼';
-        downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); set(current - step); wrap.focus(); });
-
-        // マウスホイールでスクロール
+        // マウスホイールで時刻変更
         wrap.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
             set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
-        // 矢印キー: ↓で増加、↑で減少
         wrap.setAttribute('tabindex', '0');
         wrap.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
             if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
         });
 
-        wrap.appendChild(upBtn);
         wrap.appendChild(display);
-        wrap.appendChild(downBtn);
         container.appendChild(wrap);
         hidden.value = current;
 

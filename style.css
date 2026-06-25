@@ -411,12 +411,9 @@ body {
     padding: 7px 10px;
     margin-bottom: 0;
 }
-.side-panel .ts-btn {
-    height: 22px;
-}
 .side-panel .ts-display {
     font-size: 20px;
-    padding: 5px 0;
+    padding: 9px 0;
 }
 .side-panel .purpose-options {
     gap: 8px;
@@ -2133,47 +2130,45 @@ body {
     background: #5a6268;
 }
 
-/* ========== 時刻スピナー ========== */
+/* ========== 時刻スピナー（スクロール操作のみ） ========== */
 .time-spinner {
+    position: relative;
     display: inline-flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
     user-select: none;
-    border: 2px solid #ddd;
+    width: 110px;
+    border: 1.5px solid #ddd;
     border-radius: 10px;
     overflow: hidden;
-    width: 110px;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: ns-resize;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    background: white;
 }
 
 .time-spinner:hover {
     border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0,123,255,0.12);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.10);
 }
 
-.ts-btn {
-    width: 100%;
-    height: 28px;
-    padding: 0;
-    background: #f4f6f9;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    color: #666;
-    transition: background 0.12s, color 0.12s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
+/* 上下のグラデードフェード：スクロール可能であることを示す */
+.time-spinner::before,
+.time-spinner::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 16px;
+    pointer-events: none;
+    z-index: 1;
 }
-
-.ts-btn:hover {
-    background: #e3f2fd;
-    color: #007bff;
+.time-spinner::before {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.85), transparent);
 }
-
-.ts-btn:active {
-    background: #bbdefb;
+.time-spinner::after {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(255,255,255,0.85), transparent);
 }
 
 .ts-display {
@@ -2182,11 +2177,10 @@ body {
     font-size: 22px;
     font-weight: bold;
     letter-spacing: 0.04em;
-    padding: 10px 0;
-    background: white;
+    padding: 12px 0;
     color: #222;
     line-height: 1;
-    cursor: default;
+    cursor: ns-resize;
     font-variant-numeric: tabular-nums;
 }
 
