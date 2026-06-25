@@ -2991,12 +2991,20 @@ window.onload = function() {
         const hidden    = document.getElementById(hiddenId);
         if (!container || !hidden) return null;
 
+        const TRACK_H = 40, THUMB_H = 14;
         let current = Math.max(minVal, Math.min(maxVal, initialMin));
+        let thumbEl = null;
 
         const fmt = (m) => {
             const h  = Math.floor(m / 60);
             const mm = m % 60;
             return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+        };
+
+        const updateThumb = () => {
+            if (!thumbEl) return;
+            const ratio = (current - minVal) / (maxVal - minVal);
+            thumbEl.style.top = Math.round(ratio * (TRACK_H - THUMB_H)) + 'px';
         };
 
         const set = (val) => {
@@ -3006,6 +3014,7 @@ window.onload = function() {
             current = clamped;
             display.textContent = fmt(current);
             hidden.value = current;
+            updateThumb();
             if (onChange) onChange(current, old);
         };
 
@@ -3016,6 +3025,12 @@ window.onload = function() {
         const display = document.createElement('div');
         display.className = 'ts-display';
         display.textContent = fmt(current);
+
+        const track = document.createElement('div');
+        track.className = 'ts-track';
+        thumbEl = document.createElement('div');
+        thumbEl.className = 'ts-thumb';
+        track.appendChild(thumbEl);
 
         // マウスホイールで時刻変更
         wrap.addEventListener('wheel', (e) => {
@@ -3031,8 +3046,10 @@ window.onload = function() {
         });
 
         wrap.appendChild(display);
+        wrap.appendChild(track);
         container.appendChild(wrap);
         hidden.value = current;
+        updateThumb();
 
         return { getValue: () => current, setValue: (v) => set(v) };
     }

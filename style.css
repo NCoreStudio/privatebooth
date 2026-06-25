@@ -2132,15 +2132,12 @@ body {
 
 /* ========== 時刻スピナー（スクロール操作のみ） ========== */
 .time-spinner {
-    position: relative;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     user-select: none;
-    width: 110px;
+    width: 116px;
     border: 1.5px solid #ddd;
     border-radius: 10px;
-    overflow: hidden;
     cursor: ns-resize;
     transition: border-color 0.15s, box-shadow 0.15s;
     background: white;
@@ -2151,37 +2148,44 @@ body {
     box-shadow: 0 0 0 3px rgba(0,123,255,0.10);
 }
 
-/* 上下のグラデードフェード：スクロール可能であることを示す */
-.time-spinner::before,
-.time-spinner::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 16px;
-    pointer-events: none;
-    z-index: 1;
-}
-.time-spinner::before {
-    top: 0;
-    background: linear-gradient(to bottom, rgba(255,255,255,0.85), transparent);
-}
-.time-spinner::after {
-    bottom: 0;
-    background: linear-gradient(to top, rgba(255,255,255,0.85), transparent);
-}
-
 .ts-display {
-    width: 100%;
+    flex: 1;
     text-align: center;
     font-size: 22px;
     font-weight: bold;
     letter-spacing: 0.04em;
-    padding: 12px 0;
+    padding: 11px 0 11px 8px;
     color: #222;
     line-height: 1;
     cursor: ns-resize;
     font-variant-numeric: tabular-nums;
+}
+
+/* スクロールバー風トラック */
+.ts-track {
+    width: 4px;
+    height: 40px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    margin: 0 8px 0 0;
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* スクロールバー風サム（つまみ）*/
+.ts-thumb {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 14px;
+    background: #aaa;
+    border-radius: 4px;
+    transition: top 0.08s ease, background 0.12s;
+}
+
+.time-spinner:hover .ts-thumb {
+    background: #007bff;
 }
 
 /* 時刻スピナー横並びレイアウト */
