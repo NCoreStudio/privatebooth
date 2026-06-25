@@ -411,10 +411,7 @@ body {
     padding: 7px 10px;
     margin-bottom: 0;
 }
-.side-panel .ts-display {
-    font-size: 20px;
-    padding: 9px 0;
-}
+/* サイドパネルは高さ自動（flexで収まる） */
 .side-panel .purpose-options {
     gap: 8px;
 }
@@ -2130,17 +2127,19 @@ body {
     background: #5a6268;
 }
 
-/* ========== 時刻スピナー（スクロール操作のみ） ========== */
+/* ========== 時刻スピナー（ドラムロール） ========== */
 .time-spinner {
+    position: relative;
     display: inline-flex;
-    align-items: center;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: ns-resize;
     user-select: none;
-    width: 116px;
+    width: 110px;
     border: 1.5px solid #ddd;
     border-radius: 10px;
-    cursor: ns-resize;
-    transition: border-color 0.15s, box-shadow 0.15s;
     background: white;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .time-spinner:hover {
@@ -2148,44 +2147,66 @@ body {
     box-shadow: 0 0 0 3px rgba(0,123,255,0.10);
 }
 
-.ts-display {
-    flex: 1;
-    text-align: center;
-    font-size: 22px;
-    font-weight: bold;
-    letter-spacing: 0.04em;
-    padding: 11px 0 11px 8px;
-    color: #222;
-    line-height: 1;
-    cursor: ns-resize;
-    font-variant-numeric: tabular-nums;
-}
-
-/* スクロールバー風トラック */
-.ts-track {
-    width: 4px;
-    height: 40px;
-    background: #e0e0e0;
-    border-radius: 2px;
-    margin: 0 8px 0 0;
-    position: relative;
-    flex-shrink: 0;
-}
-
-/* スクロールバー風サム（つまみ）*/
-.ts-thumb {
+/* 上下グラデードフェード */
+.time-spinner::before,
+.time-spinner::after {
+    content: '';
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 8px;
-    height: 14px;
-    background: #aaa;
-    border-radius: 4px;
-    transition: top 0.08s ease, background 0.12s;
+    left: 0; right: 0;
+    height: 20px;
+    pointer-events: none;
+    z-index: 1;
+}
+.time-spinner::before {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.92), transparent);
+}
+.time-spinner::after {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(255,255,255,0.92), transparent);
 }
 
-.time-spinner:hover .ts-thumb {
-    background: #007bff;
+/* 各スロット */
+.ts-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+}
+
+/* 前後の値：中央の半分の高さ */
+.ts-prev, .ts-next {
+    height: 17px;
+    font-size: 13px;
+    color: #444;   /* 3倍濃く: 旧 #bbb(187)→ #444(68) */
+}
+
+/* 現在値 */
+.ts-display {
+    height: 34px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+/* ドラムロールアニメーション（センターのみ） */
+@keyframes ts-in-up {
+    from { opacity: 0.15; transform: translateY(12px); }
+    to   { opacity: 1;    transform: translateY(0); }
+}
+@keyframes ts-in-dn {
+    from { opacity: 0.15; transform: translateY(-12px); }
+    to   { opacity: 1;    transform: translateY(0); }
+}
+.ts-display.ts-anim-up { animation: ts-in-up 0.13s ease-out; }
+.ts-display.ts-anim-dn { animation: ts-in-dn 0.13s ease-out; }
+
+.time-scroll-hint {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    margin-left: 4px;
 }
 
 /* 時刻スピナー横並びレイアウト */

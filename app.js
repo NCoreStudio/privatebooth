@@ -1576,7 +1576,7 @@ class BoothReservationApp {
                         <textarea id="editResNote">${reservation.note || ''}</textarea>
                     </div>
                     <div class="form-group">
-                        <label>時刻</label>
+                        <label>時刻 <span class="time-scroll-hint">（スクロール操作）</span></label>
                         <div class="time-row">
                             <div class="time-col">
                                 <span class="time-col-label">開始</span>
@@ -1612,7 +1612,10 @@ class BoothReservationApp {
                 onChange: (val, old) => {
                     const curEnd = parseInt(document.getElementById('editResEnd').value) || old + 30;
                     const gap = Math.max(curEnd - old, 30);
-                    if (editEndSpinner) editEndSpinner.setValue(Math.min(val + gap, 21 * 60));
+                    if (editEndSpinner) {
+                        editEndSpinner.setMin(val + 30);
+                        editEndSpinner.setValue(Math.min(val + gap, 21 * 60));
+                    }
                 }
             }
         );
@@ -2986,14 +2989,13 @@ window.onload = function() {
 
     // ===== 時刻スピナー =====
 
-    createTimeSpinner(containerId, hiddenId, initialMin, { minVal = 9*60, maxVal = 21*60, step = 30, onChange } = {}) {
+    createTimeSpinner(containerId, hiddenId, initialMin, { minVal: minValInit = 9*60, maxVal = 21*60, step = 30, onChange } = {}) {
+        let minVal = minValInit;
         const container = document.getElementById(containerId);
         const hidden    = document.getElementById(hiddenId);
         if (!container || !hidden) return null;
 
-        const TRACK_H = 40, THUMB_H = 14;
         let current = Math.max(minVal, Math.min(maxVal, initialMin));
-        let thumbEl = null;
 
         const fmt = (m) => {
             const h  = Math.floor(m / 60);
@@ -3001,38 +3003,41 @@ window.onload = function() {
             return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
         };
 
-        const updateThumb = () => {
-            if (!thumbEl) return;
-            const ratio = (current - minVal) / (maxVal - minVal);
-            thumbEl.style.top = Math.round(ratio * (TRACK_H - THUMB_H)) + 'px';
-        };
-
-        const set = (val) => {
-            const clamped = Math.max(minVal, Math.min(maxVal, Math.round(val / step) * step));
-            if (clamped === current) return;
-            const old = current;
-            current = clamped;
-            display.textContent = fmt(current);
-            hidden.value = current;
-            updateThumb();
-            if (onChange) onChange(current, old);
-        };
-
         container.innerHTML = '';
         const wrap = document.createElement('div');
         wrap.className = 'time-spinner';
 
+        const prevEl  = document.createElement('div');
+        prevEl.className  = 'ts-item ts-prev';
         const display = document.createElement('div');
-        display.className = 'ts-display';
-        display.textContent = fmt(current);
+        display.className = 'ts-item ts-display';
+        const nextEl  = document.createElement('div');
+        nextEl.className  = 'ts-item ts-next';
 
-        const track = document.createElement('div');
-        track.className = 'ts-track';
-        thumbEl = document.createElement('div');
-        thumbEl.className = 'ts-thumb';
-        track.appendChild(thumbEl);
+        const updateItems = () => {
+            prevEl.textContent  = current - step >= minVal ? fmt(current - step) : '';
+            display.textContent = fmt(current);
+            nextEl.textContent  = current + step <= maxVal ? fmt(current + step) : '';
+        };
+        updateItems();
 
-        // マウスホイールで時刻変更
+        const set = (val) => {
+            const clamped = Math.max(minVal, Math.min(maxVal, Math.round(val / step) * step));
+            if (clamped === current) return;
+            const increasing = clamped > current;
+            const old = current;
+            current = clamped;
+            hidden.value = current;
+            updateItems();
+
+            // 中央値だけスライドアニメーション（可変高さスロットと高速スクロールに対応）
+            display.classList.remove('ts-anim-up', 'ts-anim-dn');
+            void display.offsetWidth; // reflow でアニメーションリセット
+            display.classList.add(increasing ? 'ts-anim-up' : 'ts-anim-dn');
+
+            if (onChange) onChange(current, old);
+        };
+
         wrap.addEventListener('wheel', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -3045,19 +3050,41 @@ window.onload = function() {
             if (e.key === 'ArrowUp')   { e.preventDefault(); set(current - step); }
         });
 
+        wrap.appendChild(prevEl);
         wrap.appendChild(display);
-        wrap.appendChild(track);
+        wrap.appendChild(nextEl);
         container.appendChild(wrap);
         hidden.value = current;
-        updateThumb();
 
-        return { getValue: () => current, setValue: (v) => set(v) };
+        return {
+            getValue: () => current,
+            setValue: (v) => {
+                const clamped = Math.max(minVal, Math.min(maxVal, Math.round(v / step) * step));
+                if (clamped === current) return;
+                current = clamped;
+                hidden.value = current;
+                display.classList.remove('ts-anim-up', 'ts-anim-dn');
+                updateItems();
+            },
+            setMin: (v) => {
+                minVal = Math.round(v / step) * step;
+                if (current < minVal) {
+                    current = minVal;
+                    hidden.value = current;
+                    display.classList.remove('ts-anim-up', 'ts-anim-dn');
+                    updateItems();
+                } else {
+                    updateItems(); // prevEl の表示を更新（最小値以下になる場合に非表示）
+                }
+            }
+        };
     }
 
     onSideStartTimeChange(newVal, oldVal) {
         if (!this.sideEndSpinner) return;
         const curEnd = parseInt(document.getElementById('sideEndTimeSelect').value) || oldVal + 30;
         const gap    = Math.max(curEnd - oldVal, 30);
+        this.sideEndSpinner.setMin(newVal + 30);
         this.sideEndSpinner.setValue(Math.min(newVal + gap, 21 * 60));
     }
 
@@ -3065,6 +3092,7 @@ window.onload = function() {
         if (!this.adminEndSpinner) return;
         const curEnd = parseInt(document.getElementById('adminEndTimeSelect').value) || oldVal + 30;
         const gap    = Math.max(curEnd - oldVal, 30);
+        this.adminEndSpinner.setMin(newVal + 30);
         this.adminEndSpinner.setValue(Math.min(newVal + gap, 21 * 60));
     }
 
