@@ -3044,6 +3044,26 @@ window.onload = function() {
             set(current + (e.deltaY < 0 ? -step : step));
         }, { passive: false });
 
+        // タッチ操作（スワイプ上下で時刻変更）
+        let touchStartY = null;
+        let touchAccum = 0;
+        const TOUCH_PX_PER_STEP = 30;
+        wrap.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchAccum = 0;
+        }, { passive: true });
+        wrap.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const dy = touchStartY - e.touches[0].clientY;
+            touchAccum += dy;
+            touchStartY = e.touches[0].clientY;
+            const steps = Math.trunc(touchAccum / TOUCH_PX_PER_STEP);
+            if (steps !== 0) {
+                touchAccum -= steps * TOUCH_PX_PER_STEP;
+                set(current + steps * step);
+            }
+        }, { passive: false });
+
         wrap.setAttribute('tabindex', '0');
         wrap.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); set(current + step); }
